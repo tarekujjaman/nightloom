@@ -57,12 +57,12 @@ export function drawCallout(ctx, state) {
   const top = state.banner ? 330 : findBoss(state.moths) ? 180 : 100;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.translate(Math.max(250, Math.min(FIELD.width - 250, c.x)), Math.max(top, Math.min(FIELD.height - 90, c.y - 100 - c.age * 14)));
+  ctx.translate(Math.max(150, Math.min(FIELD.width - 150, c.x)), Math.max(top, Math.min(FIELD.height - 110, c.y - 100 - c.age * 14)));
   ctx.scale(pop, pop);
   tagCentred(ctx, 'LOOP CLOSED!', 0, -62, P.cyan, 16, 12);
   glowText(ctx, `+${formatScore(c.points)}`, 0, -12, { size: 52, color: P.goldLight, glow: P.gold, blur: 22, outline: P.ink });
-  const chain = c.chain > 1 ? ` · ${c.chain}-LOOP CHAIN` : '';
-  glowText(ctx, `${c.tier} · ${c.count} MOTH${c.count === 1 ? '' : 'S'} · ×${Math.round(c.multiplier * 10) / 10}${chain}`, 0, 30, { size: 18, color: c.chain > 1 ? P.magenta : P.text, outline: P.ink, letterSpacing: 1 });
+  glowText(ctx, `${c.tier} · ${c.count} MOTH${c.count === 1 ? '' : 'S'}`, 0, 30, { size: 18, color: P.text, outline: P.ink, letterSpacing: 1 });
+  glowText(ctx, `×${Math.round(c.multiplier * 10) / 10}${c.chain > 1 ? ` · ${c.chain}-LOOP CHAIN` : ''}`, 0, 54, { size: 17, color: c.chain > 1 ? P.magenta : P.gold, outline: P.ink, letterSpacing: 1 });
   ctx.restore();
 }
 

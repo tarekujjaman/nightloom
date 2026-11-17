@@ -1,8 +1,9 @@
-// The renderer: the realm's sky, the Loom and the field back to front, then the HUD frame, the screen on top and the motes last.
+// The renderer: the realm's painted hill, the Loom and the field back to front, then the HUD frame, the screen on top and the motes last.
 import { ABILITY, ARENA, FIELD, PALETTE as P, VIEW, WEAVE } from './config.js';
 import { drawSprite, glowText, lighter, makeGlowSprite, poly, rgba, ring, sparklePath } from './glow.js';
-import { REALMS, drawBackdropStars, drawRealm, drawVignette } from './realms.js';
+import { REALMS, drawRealm } from './realms.js';
 import { drawLoom } from './loom.js';
+import { WAVE_COUNT } from './waves.js';
 import { drawMoth } from './mothart.js';
 import { drawLances } from './abilities.js';
 import { drawMotes } from './starlight.js';
@@ -234,14 +235,13 @@ export function createRenderer(canvas) {
   }
 
   function drawField(state) {
-    const { weaver, effects } = state;
+    const { effects } = state;
     const realm = Math.max(0, state.realm);
     const lost = state.phase === PHASE.LOST;
     ctx.save();
     ctx.translate(effects.shakeX, effects.shakeY);
-    drawRealm(ctx, realm, state.time);
-    drawBackdropStars(ctx, state.backdrop, weaver.x - FIELD.width / 2, weaver.y - FIELD.height / 2, state.time);
-    drawLoom(ctx, state.loom, state.time, REALMS[realm].accent);
+    drawRealm(ctx, realm, state.time, state.loom);
+    drawLoom(ctx, state.loom, state.time, REALMS[realm].accent, (state.wave - 1 + Math.min(1, state.stats.waveCaptured / Math.max(1, state.waveTotal))) / WAVE_COUNT);
     drawAfterglows(state);
     if (!lost) drawAnchorStars(state);
     for (const moth of state.moths) if (moth.alive) drawMoth(ctx, moth, state.time);
@@ -252,7 +252,6 @@ export function createRenderer(canvas) {
     if (boss) tagCentred(ctx, BOSSES[boss.kind].name.toUpperCase(), boss.x, boss.y + boss.radius + 13 * boss.veils + 30, P.gold, 12, 8);
     drawParticles(state);
     ctx.restore();
-    drawVignette(ctx);
     drawOverlays(state);
   }
 

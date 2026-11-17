@@ -60,7 +60,7 @@ export function drawTitle(ctx, state, ui) {
   const cx = FIELD.width / 2;
   const t = ui.time;
   const shade = ctx.createLinearGradient(0, 0, 0, FIELD.height);
-  for (const [at, alpha] of [[0, 0.85], [0.3, 0.6], [0.37, 0.22], [0.69, 0.22], [0.78, 0.72], [1, 0.92]]) shade.addColorStop(at, `rgba(8, 3, 26, ${alpha})`);
+  for (const [at, alpha] of [[0, 0.72], [0.3, 0.5], [0.37, 0.18], [0.69, 0.18], [0.78, 0.66], [1, 0.9]]) shade.addColorStop(at, `rgba(8, 3, 26, ${alpha})`);
   ctx.fillStyle = shade;
   ctx.fillRect(0, 0, FIELD.width, FIELD.height);
 

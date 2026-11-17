@@ -1,7 +1,7 @@
 // The rules in fixed steps: weaving, captures, the Loom's bites, starlight, abilities, moths, hearts, waves, realms, cards and the end of the night.
 import { ATTRACT, LOOM, MOTHS, SCORING, SLOW_TIME, SPAWN, STARLIGHT, STARS, WEAVE } from './config.js';
 import { createRandom } from './random.js';
-import { makeBackdropStars, placeAnchorStars, starAt, starInReach } from './stars.js';
+import { placeAnchorStars, starAt, starInReach } from './stars.js';
 import { createWeaver, hurtWeaver, stepWeaver, weaverVulnerable } from './weaver.js';
 import { anchorThread, canCloseLoop, canExtendTo, chainSegments, closeLoop, createWeave, distanceToPolygonEdge, extendThread, nearestOnSegment, polygonArea, polygonCaptures, polygonCentroid, releaseThread, severThread, stepWeave } from './threads.js';
 import { edgeSpawnPoint, knockBack, mothCapturable, mothTouchesWeaver, spawnMoth, stepMoth } from './enemies.js';
@@ -36,7 +36,7 @@ export function createWorld(seed, attract = false) {
   const random = createRandom(seed);
   return {
     seed, random, attract, time: 0, phase: PHASE.PLAY, phaseTime: 0, wave: 0, waveTotal: 0, spawnQueue: [], spawnTimer: 0, realm: -1,
-    stars: [], backdrop: makeBackdropStars(random), weaver: createWeaver(), weave: createWeave(), loom: createLoom(), starlight: createStarlight(), abilities: createAbilities(), moths: [], pending: [],
+    stars: [], weaver: createWeaver(), weave: createWeave(), loom: createLoom(), starlight: createStarlight(), abilities: createAbilities(), moths: [], pending: [],
     score: 0, combo: { chain: 0, lastCapture: -Infinity, best: 0, current: 0 }, lostBy: '',
     stats: { captured: 0, loops: 0, burned: 0, hits: 0, bestLoop: 0, perfectWaves: 0, bestChain: 0, waveCaptured: 0, starsPlaced: 0 },
     upgrades: emptyUpgrades(), offer: [], slow: { charge: 1, active: 0, duration: SLOW_TIME.duration, cooldown: SLOW_TIME.cooldown },

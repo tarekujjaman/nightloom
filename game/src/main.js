@@ -9,6 +9,7 @@ import { createAttractPilot, pilotControl } from './attract.js';
 import { runGrade } from './scoring.js';
 import { waveDefinition } from './waves.js';
 import { realmOf } from './realms.js';
+import { ART, artReady } from './art.js';
 
 const MAX_FRAME = 0.25;
 const BEST_KEY = 'nightloom.best.v1';
@@ -31,7 +32,7 @@ function store(value) {
 }
 
 async function runShot(name) {
-  const { stageShot } = await import(new URL('../../tools/stage.mjs', import.meta.url).href);
+  const [{ stageShot }] = await Promise.all([import(new URL('../../tools/stage.mjs', import.meta.url).href), artReady]);
   const scene = stageShot(name, seed);
   let painted = 0;
   requestAnimationFrame(function paint() {
@@ -184,7 +185,7 @@ function runGame() {
 
   backToTitle();
   requestAnimationFrame(frame);
-  if (params.has('debug')) window.__nightloom = { world: () => world, screen: () => screen, best: () => best, grade: () => runGrade(world), realm: () => realmOf(world.wave).name };
+  if (params.has('debug')) window.__nightloom = { world: () => world, screen: () => screen, best: () => best, grade: () => runGrade(world), realm: () => realmOf(world.wave).name, art: () => ({ loaded: ART.loaded, total: ART.total, failed: ART.failed }) };
 }
 
 if (params.get('shot')) runShot(params.get('shot'));

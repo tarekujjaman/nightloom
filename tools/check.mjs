@@ -79,6 +79,10 @@ async function main() {
     console.log('title');
     expect((await read('g.screen()')) === 'title', 'the title screen shows first');
     expect((await read('w.attract && w.stars.length')) > 0, 'the attract scene runs behind the title');
+    const art = await read('g.art()');
+    expect(art.failed.length === 0 && art.loaded === art.total, `every art file loads (${art.loaded} of ${art.total}: four hill backdrops, their lights, the Loom sheet)${art.failed.length ? `; failed: ${art.failed.join(', ')}` : ''}`);
+    const lights = await call("const { villageLight } = await import('./src/realms.js'); return [villageLight({ health: 100, max: 100 }, 0), villageLight({ health: 0, max: 100 }, 0)];");
+    expect(lights[0] > 0.9 && lights[1] < 0.5, `the village lights dim with the Loom (${lights[0].toFixed(2)} whole, ${lights[1].toFixed(2)} unravelled)`);
 
     console.log('start');
     await mouse(session, sessionId, 'mouseMoved', 640, 400);

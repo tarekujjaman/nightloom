@@ -16,6 +16,7 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.webp': 'image/webp',
 };
 
 /** Serve `root` on an ephemeral port; resolves to { port, close }. */
@@ -64,11 +65,12 @@ function freePort() {
   });
 }
 
-/** Launch headless Chrome with remote debugging in a temporary profile; resolves to { wsUrl, kill }. */
-export async function launchChrome() {
+/** Launch headless Chrome with remote debugging in a temporary profile (plus `extraArgs`); resolves to { wsUrl, kill }. */
+export async function launchChrome(extraArgs = []) {
   const port = await freePort();
   const userDataDir = mkdtempSync(join(tmpdir(), 'nightloom-chrome-'));
   const child = spawn(CHROME, [
+    ...extraArgs,
     '--headless=new',
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${userDataDir}`,

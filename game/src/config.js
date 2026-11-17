@@ -20,7 +20,7 @@ export const WEAVE = {
   minLoop: 3, flash: 0.7, afterglow: 3.5, attractAfterglow: 12, cutSeconds: 0.8, steadyCutSeconds: 1.8,
   burnSeconds: 0.55, cutterBurnSeconds: 1.6, wideNet: 40, lodestar: 80, stunRadius: 90,
 };
-export const LOOM = { x: FIELD.width / 2, y: FIELD.height / 2 - 6, radius: 74, clear: 150, health: 100, threads: 12, heal: 12, perfectHeal: 10 };
+export const LOOM = { x: FIELD.width / 2, y: FIELD.height / 2 - 6, radius: 74, clear: 180, health: 100, threads: 12, heal: 12, perfectHeal: 10 };
 export const MOTHS = {
   drifter: { radius: 17, speed: 58, points: 10, bite: 4 },
   dasher: { radius: 16, speed: 75, dashSpeed: 660, points: 15, bite: 5 },

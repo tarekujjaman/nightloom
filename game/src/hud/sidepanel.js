@@ -85,7 +85,7 @@ export function drawSidePanel(ctx, state, ui, title) {
     tag(ctx, 'FOUR REALMS', inner, cy, P.violet, 13);
     REALMS.forEach((realm, i) => {
       const ry = cy + 24 + i * 21;
-      ctx.fillStyle = realm.sky[0];
+      ctx.fillStyle = realm.sky;
       ctx.strokeStyle = realm.accent;
       ctx.lineWidth = 2;
       ctx.fillRect(inner, ry - 7, 22, 14);
