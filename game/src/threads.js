@@ -1,100 +1,60 @@
-// The loom: the chain being woven, the loop it closes into, its flash and afterglow, and what a loop encloses.
-import { LOOM } from './config.js';
+// The weave: the chain being threaded, the loop it closes into, its flash and afterglow, and polygon maths.
+import { WEAVE } from './config.js';
 
-export function createLoom() {
-  return { chain: [], active: false, cursorX: 0, cursorY: 0, flashes: [], afterglows: [], ghosts: [], cut: null, plucked: 0 };
+export const createWeave = () => ({ chain: [], active: false, cursorX: 0, cursorY: 0, flashes: [], afterglows: [], cut: null, plucked: 0, pluckWave: 0 });
+
+export function anchorThread(weave, starIndex) {
+  Object.assign(weave, { chain: [starIndex], active: true, cut: null, plucked: 1 });
 }
 
-export function anchorThread(loom, starIndex) {
-  loom.chain = [starIndex];
-  loom.active = true;
-  loom.cut = null;
-  loom.plucked = 1;
+export function extendThread(weave, starIndex) {
+  weave.chain.push(starIndex);
+  weave.plucked += 1;
 }
 
-export function extendThread(loom, starIndex) {
-  loom.chain.push(starIndex);
-  loom.plucked += 1;
+export const canCloseLoop = (weave, starIndex) => weave.active && weave.chain.length >= WEAVE.minLoop && weave.chain[0] === starIndex;
+export const canExtendTo = (weave, starIndex) => weave.active && !weave.chain.includes(starIndex);
+
+export function closeLoop(weave, stars, afterglowSeconds, tier = 1) {
+  const polygon = weave.chain.map((index) => ({ x: stars[index].x, y: stars[index].y }));
+  weave.flashes.push({ polygon, age: 0, tier });
+  weave.afterglows.push({ polygon, age: 0, life: afterglowSeconds, tier });
+  releaseThread(weave);
 }
 
-export function canCloseLoop(loom, starIndex) {
-  return loom.active && loom.chain.length >= LOOM.minLoop && loom.chain[0] === starIndex;
+export function releaseThread(weave) {
+  Object.assign(weave, { chain: [], active: false, cut: null });
 }
 
-export function canExtendTo(loom, starIndex) {
-  return loom.active && !loom.chain.includes(starIndex);
+export function severThread(weave, segmentIndex) {
+  weave.chain = weave.chain.slice(0, segmentIndex + 1);
+  weave.cut = null;
+  weave.active = weave.chain.length > 0;
 }
 
-/** Close the chain into a loop: it flashes, then glows for `afterglowSeconds`; the chain is cleared. */
-export function closeLoop(loom, stars, afterglowSeconds, tier = 1) {
-  const polygon = loom.chain.map((index) => ({ x: stars[index].x, y: stars[index].y }));
-  loom.flashes.push({ polygon, age: 0, tier });
-  loom.afterglows.push({ polygon, age: 0, life: afterglowSeconds, tier });
-  loom.chain = [];
-  loom.active = false;
-  loom.cut = null;
+export function chainSegments(weave, stars) {
+  return weave.chain.slice(1).map((index, i) => {
+    const a = stars[weave.chain[i]];
+    const b = stars[index];
+    return { ax: a.x, ay: a.y, bx: b.x, by: b.y, index: i };
+  });
 }
 
-export function releaseThread(loom, stars) {
-  if (loom.chain.length >= 2) loom.ghosts.push({ points: loom.chain.map((index) => ({ x: stars[index].x, y: stars[index].y })), age: 0 });
-  loom.chain = [];
-  loom.active = false;
-  loom.cut = null;
+export function stepWeave(weave, dt) {
+  for (const list of [weave.flashes, weave.afterglows]) for (const item of list) item.age += dt;
+  weave.flashes = weave.flashes.filter((flash) => flash.age < WEAVE.flash);
+  weave.afterglows = weave.afterglows.filter((glow) => glow.age < glow.life);
+  weave.pluckWave = Math.max(0, weave.pluckWave - dt * 1.8);
 }
 
-/** A cutter has severed segment `segmentIndex`: the chain keeps the stars up to it; the rest falls away. */
-export function severThread(loom, stars, segmentIndex) {
-  const lost = loom.chain.slice(segmentIndex);
-  if (lost.length >= 2) loom.ghosts.push({ points: lost.map((index) => ({ x: stars[index].x, y: stars[index].y })), age: 0, cut: true });
-  loom.chain = loom.chain.slice(0, segmentIndex + 1);
-  loom.cut = null;
-  if (loom.chain.length === 0) loom.active = false;
-}
+export const polygonArea = (pts) => Math.abs(pts.reduce((sum, a, i) => sum + a.x * pts[(i + 1) % pts.length].y - pts[(i + 1) % pts.length].x * a.y, 0)) / 2;
+export const polygonCentroid = (pts) => ({ x: pts.reduce((s, p) => s + p.x, 0) / pts.length, y: pts.reduce((s, p) => s + p.y, 0) / pts.length });
 
-export function chainSegments(loom, stars) {
-  const segments = [];
-  for (let i = 0; i + 1 < loom.chain.length; i += 1) {
-    const a = stars[loom.chain[i]];
-    const b = stars[loom.chain[i + 1]];
-    segments.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, index: i });
-  }
-  return segments;
-}
-
-export function stepLoom(loom, dt) {
-  for (const flash of loom.flashes) flash.age += dt;
-  loom.flashes = loom.flashes.filter((flash) => flash.age < LOOM.flash);
-  for (const glow of loom.afterglows) glow.age += dt;
-  loom.afterglows = loom.afterglows.filter((glow) => glow.age < glow.life);
-  for (const ghost of loom.ghosts) ghost.age += dt;
-  loom.ghosts = loom.ghosts.filter((ghost) => ghost.age < 0.6);
-}
-
-export function polygonArea(points) {
-  let sum = 0;
-  for (let i = 0; i < points.length; i += 1) {
-    const a = points[i];
-    const b = points[(i + 1) % points.length];
-    sum += a.x * b.y - b.x * a.y;
-  }
-  return Math.abs(sum) / 2;
-}
-
-export function polygonCentroid(points) {
-  let x = 0;
-  let y = 0;
-  for (const point of points) {
-    x += point.x;
-    y += point.y;
-  }
-  return { x: x / points.length, y: y / points.length };
-}
-
-export function pointInPolygon(x, y, points) {
+export function pointInPolygon(x, y, pts) {
   let inside = false;
-  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
-    const a = points[i];
-    const b = points[j];
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i, i += 1) {
+    const a = pts[i];
+    const b = pts[j];
     if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
   }
   return inside;
@@ -110,16 +70,5 @@ export function nearestOnSegment(px, py, ax, ay, bx, by) {
   return { x, y, distance: Math.hypot(px - x, py - y) };
 }
 
-export function distanceToPolygonEdge(x, y, points) {
-  let best = Infinity;
-  for (let i = 0; i < points.length; i += 1) {
-    const a = points[i];
-    const b = points[(i + 1) % points.length];
-    best = Math.min(best, nearestOnSegment(x, y, a.x, a.y, b.x, b.y).distance);
-  }
-  return best;
-}
-
-export function polygonCaptures(x, y, points, margin = 0) {
-  return pointInPolygon(x, y, points) || (margin > 0 && distanceToPolygonEdge(x, y, points) <= margin);
-}
+export const distanceToPolygonEdge = (x, y, pts) => Math.min(...pts.map((a, i) => nearestOnSegment(x, y, a.x, a.y, pts[(i + 1) % pts.length].x, pts[(i + 1) % pts.length].y).distance));
+export const polygonCaptures = (x, y, pts, margin = 0) => pointInPolygon(x, y, pts) || (margin > 0 && distanceToPolygonEdge(x, y, pts) <= margin);

@@ -1,30 +1,12 @@
-// Sparks, floating labels, screen shake and colour flashes: feedback that is not part of the rules.
+// Sparks, floating labels, screen shake and colour flashes.
 
-export function createEffects() {
-  return { particles: [], texts: [], shake: 0, shakeX: 0, shakeY: 0, redFlash: 0, goldFlash: 0, cyanFlash: 0 };
-}
+export const createEffects = () => ({ particles: [], texts: [], shake: 0, shakeX: 0, shakeY: 0, redFlash: 0, goldFlash: 0, cyanFlash: 0 });
 
-/** `count` sparks from (x, y) in every direction. */
 export function burst(effects, random, x, y, { count = 16, colors = ['#ffd36b'], speed = 220, life = 0.7, size = 3, drag = 2.5, gravity = 0 } = {}) {
   for (let i = 0; i < count; i += 1) {
     const angle = random.angle();
     const velocity = speed * (0.35 + random.next() * 0.65);
-    effects.particles.push({
-      x, y, vx: Math.cos(angle) * velocity, vy: Math.sin(angle) * velocity, life: life * (0.6 + random.next() * 0.4), age: 0,
-      size: size * (0.6 + random.next() * 0.8), color: colors[Math.floor(random.next() * colors.length)], drag, gravity,
-    });
-  }
-}
-
-export function edgeSparks(effects, random, polygon, colors) {
-  for (let i = 0; i < polygon.length; i += 1) {
-    const a = polygon[i];
-    const b = polygon[(i + 1) % polygon.length];
-    const count = Math.max(2, Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / 28));
-    for (let k = 0; k < count; k += 1) {
-      const t = (k + random.next()) / count;
-      burst(effects, random, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, { count: 1, colors, speed: 70, life: 0.6, size: 2.4, drag: 3 });
-    }
+    effects.particles.push({ x, y, vx: Math.cos(angle) * velocity, vy: Math.sin(angle) * velocity, life: life * (0.6 + random.next() * 0.4), age: 0, size: size * (0.6 + random.next() * 0.8), color: colors[Math.floor(random.next() * colors.length)], drag, gravity });
   }
 }
 

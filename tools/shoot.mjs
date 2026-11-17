@@ -15,7 +15,7 @@ const filter = process.argv[2] ?? '';
 async function main() {
   const shots = JSON.parse(readFileSync(join(root, 'shots.json'), 'utf8')).filter((shot) => shot.name.includes(filter));
   mkdirSync(join(root, 'screenshots'), { recursive: true });
-  const server = await serveStatic(join(root, 'game'));
+  const server = await serveStatic(root);
   const chrome = await launchChrome();
   const session = new Session(chrome.wsUrl);
   await session.connect();
@@ -32,7 +32,7 @@ async function main() {
     await session.send('Page.enable', {}, sessionId);
     await session.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }, sessionId);
     for (const shot of shots) {
-      const url = `http://127.0.0.1:${server.port}/${shot.query}`;
+      const url = `http://127.0.0.1:${server.port}/game/${shot.query}`;
       await session.send('Page.navigate', { url }, sessionId);
       await waitFor(session, sessionId, 'window.__shotReady === true', 60000);
       const size = await evaluate(session, sessionId, '[window.innerWidth, window.innerHeight]');

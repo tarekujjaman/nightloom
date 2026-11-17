@@ -1,92 +1,101 @@
-// The top bar (word mark, score, wave progress, WIN and LOSE with live counts) and the bottom bar (hearts, still time, combo, best, grade, controls).
-import { LAYOUT, PALETTE, SCORING, VIEW } from '../config.js';
-import { glowText } from '../glow.js';
+// The top bar (score, wave and realm, LOOM health, starlight, WIN and LOSE) and the bottom bar (hearts, hotbar, combo, best, grade, keys).
+import { LAYOUT, PALETTE as P, SCORING, VIEW } from '../config.js';
+import { glowText, label, measureText } from '../glow.js';
 import { drawLogo } from '../screens/title.js';
 import { formatScore, runGrade } from '../scoring.js';
 import { WAVE_COUNT, waveDefinition } from '../waves.js';
-import { heartRow, keyStrip, meter, pill, tag, tagWidth } from './widgets.js';
+import { REALMS, realmOf } from '../realms.js';
+import { loomColor } from '../loom.js';
+import { drawHotbar } from './hotbar.js';
+import { SOFT, heartRow, keyStrip, meter, pill, starGlyph, tag, tagWidth } from './widgets.js';
 
-export const CONTROLS = [['WASD', 'move'], ['HOLD LMB', 'weave star to star'], ['1ST STAR', 'closes the loop'], ['SPACE', 'still time'], ['P', 'pause'], ['M', 'sound'], ['R', 'restart']];
-export const GRADE_COLORS = { S: PALETTE.gold, A: PALETTE.win, B: PALETTE.cyan, C: PALETTE.violet, D: PALETTE.textSoft };
+export const CONTROLS = [['WASD', 'move'], ['HOLD LMB', 'weave star to star'], ['1ST STAR', 'closes the loop'], ['RMB', 'pluck'], ['SPACE', 'still time'], ['E', 'plant a star'], ['Q', 'lance'], ['P', 'pause'], ['M', 'sound'], ['R', 'restart']];
+export const GRADE_COLORS = { S: P.gold, A: P.win, B: P.cyan, C: P.violet, D: P.textSoft };
 
-/** Moths still to capture this wave: alive, queued or about to hatch. */
-export function mothsLeft(state) {
-  return state.moths.filter((moth) => moth.alive).length + state.spawnQueue.length + state.pending.length;
-}
+export const mothsLeft = (state) => state.moths.filter((moth) => moth.alive).length + state.spawnQueue.length + state.pending.length;
 
-function banner(ctx, x, w, label, color, rule, count) {
+function banner(ctx, x, w, name, color, rule, count) {
   pill(ctx, x, 7, w, LAYOUT.top - 14, color);
-  const used = tag(ctx, label, x + 10, 33, color, 14, 9);
-  glowText(ctx, rule, x + 18 + used, 33, { size: 16, weight: '700', color: PALETTE.text, align: 'left' });
-  if (count) glowText(ctx, count, x + w - 12, 33, { size: 22, color, align: 'right' });
+  tag(ctx, name, x + 10, 22, color, 12, 7);
+  if (count) label(ctx, count, x + w - 12, 22, 15, color, 'right');
+  glowText(ctx, rule, x + 10, 45, { ...SOFT, size: 11.5, color: P.text });
 }
 
 export function drawTopBar(ctx, state, ui, title) {
   const h = LAYOUT.top;
-  ctx.fillStyle = PALETTE.panel;
+  ctx.fillStyle = P.panel;
   ctx.fillRect(0, 0, VIEW.width, h);
-  ctx.fillStyle = PALETTE.panelLine;
+  ctx.fillStyle = P.panelLine;
   ctx.fillRect(0, h - 2, VIEW.width, 2);
-  drawLogo(ctx, 94, 28, 22, ui.time);
+  drawLogo(ctx, 90, 28, 21, ui.time);
 
-  pill(ctx, 182, 7, 168, h - 14, PALETTE.gold);
-  glowText(ctx, title ? 'HIGH SCORE' : 'SCORE', 194, 19, { size: 11, color: PALETTE.gold, align: 'left', letterSpacing: 3 });
-  glowText(ctx, formatScore(title ? ui.best : state.score), 194, 42, { size: 27, color: PALETTE.goldLight, glow: PALETTE.gold, blur: 14, align: 'left' });
+  pill(ctx, 176, 7, 134, h - 14, P.gold);
+  label(ctx, title ? 'HIGH SCORE' : 'SCORE', 188, 19, 10.5, P.gold, 'left', 3);
+  glowText(ctx, formatScore(title ? ui.best : state.score), 188, 42, { size: 25, color: P.goldLight, glow: P.gold, blur: 14, align: 'left' });
 
-  pill(ctx, 360, 7, 222, h - 14, PALETTE.violet);
+  const realm = realmOf(state.wave);
+  pill(ctx, 318, 7, 206, h - 14, realm.accent);
   if (title) {
-    glowText(ctx, `${WAVE_COUNT} WAVES`, 372, 22, { size: 20, color: PALETTE.text, align: 'left' });
-    glowText(ctx, '2 BOSSES · 9 THREADS · 4 RELICS', 372, 45, { size: 11, color: PALETTE.textSoft, align: 'left', letterSpacing: 1 });
+    label(ctx, `${WAVE_COUNT} WAVES · ${REALMS.length} REALMS`, 330, 21, 17, P.text, 'left');
+    glowText(ctx, '2 BOSSES · 10 THREADS · 4 RELICS', 330, 44, { ...SOFT, size: 10.5, letterSpacing: 1 });
   } else {
     const left = mothsLeft(state);
-    const total = Math.max(1, state.waveTotal);
-    glowText(ctx, `WAVE ${state.wave} / ${WAVE_COUNT}`, 372, 21, { size: 20, color: PALETTE.text, align: 'left' });
-    glowText(ctx, `${waveDefinition(state.wave).name.toUpperCase()} · ${left} LEFT`, 372, 41, { size: 11, color: PALETTE.textSoft, align: 'left', letterSpacing: 1 });
-    meter(ctx, 372, 50, 198, 5, 1 - Math.min(left, total) / total, PALETTE.violet);
+    label(ctx, `WAVE ${state.wave} / ${WAVE_COUNT}`, 330, 20, 17, P.text, 'left');
+    label(ctx, `${left} LEFT`, 516, 20, 10.5, P.textSoft, 'right', 0.5);
+    const used = tag(ctx, realm.name.toUpperCase(), 330, 42, realm.accent, 9.5, 5);
+    const name = waveDefinition(state.wave).name.toUpperCase();
+    if (338 + used + measureText(ctx, name, { size: 9 }) < 516) label(ctx, name, 338 + used, 42, 9, P.textSoft, 'left');
+    meter(ctx, 330, 53, 182, 4, 1 - Math.min(left, state.waveTotal) / Math.max(1, state.waveTotal), realm.accent);
   }
 
-  banner(ctx, 592, 300, 'WIN', PALETTE.win, `weave all ${WAVE_COUNT} waves`, title ? '' : `${state.wave - 1}/${WAVE_COUNT}`);
-  banner(ctx, 902, 276, 'LOSE', PALETTE.lose, 'all hearts gone', title ? '' : `${state.weaver.hearts}/${state.weaver.maxHearts} ♥`);
-  const sound = ui.muted ? 'MUTED' : 'SOUND ON';
-  tag(ctx, sound, VIEW.width - 10 - tagWidth(ctx, sound, 11, 8), 33, ui.muted ? PALETTE.lose : PALETTE.cyan, 11, 8);
+  const { loom } = state;
+  const frac = loom.health / loom.max;
+  const tint = loom.hurt > 0.4 ? '#ffffff' : loomColor(frac);
+  pill(ctx, 532, 7, 196, h - 14, loom.hurt > 0 ? P.ember : P.gold);
+  tag(ctx, 'LOOM', 544, 22, P.gold, 12, 7);
+  label(ctx, `${Math.ceil(loom.health)} / ${loom.max}`, 716, 22, 17, tint, 'right');
+  meter(ctx, 544, 40, 172, 9, frac, tint);
+  glowText(ctx, frac < 0.3 && !title ? 'FRAYING · catch the moths at its heart' : 'moths that reach it tear its threads', 544, 55, { ...SOFT, size: 9.5, color: frac < 0.3 && !title ? P.ember : P.textSoft });
+
+  const st = state.starlight;
+  pill(ctx, 736, 7, 134, h - 14, P.gold);
+  starGlyph(ctx, 754, 33, 11 + st.pop * 3, P.goldLight);
+  glowText(ctx, String(Math.max(0, st.shown)), 770, 30, { size: 24 + st.pop * 4, color: P.goldLight, glow: P.gold, blur: 12, align: 'left' });
+  label(ctx, 'STARLIGHT', 770, 50, 9.5, P.gold, 'left', 2);
+
+  banner(ctx, 878, 170, 'WIN', P.win, `weave all ${WAVE_COUNT} waves`, title ? '' : `${state.wave - 1}/${WAVE_COUNT}`);
+  banner(ctx, 1056, 216, 'LOSE', P.lose, 'the Loom unravels or the Weaver falls', title ? '' : `${Math.ceil(loom.health)} LOOM · ${state.weaver.hearts}/${state.weaver.maxHearts} ♥`);
 }
 
 export function drawBottomBar(ctx, state, ui, title) {
   const y = VIEW.height - LAYOUT.bottom;
-  const row = y + 27;
-  ctx.fillStyle = PALETTE.panel;
+  ctx.fillStyle = P.panel;
   ctx.fillRect(0, y, VIEW.width, LAYOUT.bottom);
-  ctx.fillStyle = PALETTE.panelLine;
+  ctx.fillStyle = P.panelLine;
   ctx.fillRect(0, y, VIEW.width, 2);
-  const { weaver, slow, combo } = state;
+  const { weaver, combo } = state;
 
-  heartRow(ctx, 28 + tag(ctx, 'HEARTS', 16, row, PALETTE.heart, 12), row, weaver.hearts, weaver.maxHearts, 24, weaver.invulnerable > 0, state.time);
-
-  const ready = slow.owned && slow.active <= 0 && slow.charge >= 1;
-  tag(ctx, 'STILL TIME', 300, row - 9, slow.owned ? PALETTE.cyan : PALETTE.panelLine, 11, 7);
-  const status = title ? 'SPACE · slows moths' : !slow.owned ? 'not held yet' : slow.active > 0 ? 'SLOWING THE SKY' : ready ? 'READY · press SPACE' : 'recharging';
-  glowText(ctx, status, 396, row - 9, { size: 12, color: ready || slow.active > 0 ? PALETTE.cyan : PALETTE.textSoft, align: 'left' });
-  meter(ctx, 300, row + 5, 200, 10, slow.owned ? (slow.active > 0 ? slow.active / slow.duration : slow.charge) : 0, PALETTE.cyan);
+  heartRow(ctx, 28 + tag(ctx, 'HEARTS', 16, y + 30, P.heart, 12), y + 30, weaver.hearts, weaver.maxHearts, 22, weaver.invulnerable > 0, state.time);
+  drawHotbar(ctx, state, title);
 
   const comboOn = combo.current > 0 && !title;
-  tag(ctx, 'COMBO', 530, row - 9, comboOn ? PALETTE.cyan : PALETTE.panelLine, 11, 7);
+  tag(ctx, 'COMBO', 690, y + 20, comboOn ? P.cyan : P.panelLine, 11, 7);
   if (comboOn) {
-    glowText(ctx, `×${Math.round(combo.current * 10) / 10}`, 602, row - 9, { size: 22, color: PALETTE.cyan, glow: PALETTE.cyanDeep, blur: 10, align: 'left' });
-    glowText(ctx, combo.chain > 1 ? `${combo.chain}-LOOP CHAIN` : 'chain more loops!', 670, row - 9, { size: 12, color: PALETTE.textSoft, align: 'left' });
-  } else {
-    glowText(ctx, combo.best > 0 && !title ? `best ×${Math.round(combo.best * 10) / 10} · loops within 5 s chain` : 'loops closed within 5 s chain', 602, row - 9, { size: 12, color: PALETTE.textSoft, align: 'left' });
-  }
-  meter(ctx, 530, row + 5, 200, 8, comboOn ? Math.max(0, 1 - (state.time - combo.lastCapture) / SCORING.comboWindow) : 0, PALETTE.cyan);
+    glowText(ctx, `×${Math.round(combo.current * 10) / 10}`, 760, y + 20, { size: 20, color: P.cyan, glow: P.cyanDeep, blur: 10, align: 'left' });
+    glowText(ctx, combo.chain > 1 ? `${combo.chain}-LOOP CHAIN` : 'chain more!', 822, y + 20, { ...SOFT, size: 11 });
+  } else glowText(ctx, combo.best > 0 && !title ? `best ×${Math.round(combo.best * 10) / 10} · 5 s chain` : 'loops within 5 s chain', 760, y + 20, { ...SOFT, size: 11 });
+  meter(ctx, 690, y + 36, 196, 7, comboOn ? Math.max(0, 1 - (state.time - combo.lastCapture) / SCORING.comboWindow) : 0, P.cyan);
 
-  glowText(ctx, formatScore(ui.best), 780 + tag(ctx, 'BEST', 770, row, PALETTE.gold, 12), row, { size: 18, color: PALETTE.goldLight, align: 'left' });
+  label(ctx, formatScore(ui.best), 906 + tag(ctx, 'BEST', 898, y + 20, P.gold, 11, 7), y + 20, 15, P.goldLight, 'left');
 
   const grade = title ? { letter: 'S', progress: 1 } : runGrade(state);
   const color = GRADE_COLORS[grade.letter];
-  pill(ctx, 990, row - 23, 54, 46, color, PALETTE.panel, 2.5);
-  glowText(ctx, grade.letter, 1017, row + 1, { size: 32, color, glow: color, blur: 14 });
-  tag(ctx, title ? 'GRADES S·A·B·C·D' : 'RUN GRADE', 1054, row - 9, color, 11, 7);
-  meter(ctx, 1054, row + 5, 120, 8, grade.progress, color);
-  glowText(ctx, title ? 'score vs par' : 'to next grade', 1182, row + 9, { size: 11, color: PALETTE.textSoft, align: 'left' });
+  pill(ctx, 1036, y + 9, 48, 42, color, P.panel, 2.5);
+  glowText(ctx, grade.letter, 1060, y + 31, { size: 28, color, glow: color, blur: 14 });
+  tag(ctx, title ? 'GRADES S·A·B·C·D' : 'RUN GRADE', 1094, y + 20, color, 10.5, 6);
+  meter(ctx, 1094, y + 36, 172, 7, grade.progress, color);
+  glowText(ctx, title ? 'score against par' : 'to the next grade', 1094, y + 53, { ...SOFT, size: 10 });
 
-  keyStrip(ctx, CONTROLS, 16, y + 65, 14);
+  keyStrip(ctx, [CONTROLS[0], CONTROLS[2], CONTROLS[7], CONTROLS[8], CONTROLS[9]], 16, y + 81, 13);
+  if (ui.muted) tag(ctx, 'MUTED', VIEW.width - 10 - tagWidth(ctx, 'MUTED', 11, 7), y + 81, P.lose, 11, 7);
 }

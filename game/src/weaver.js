@@ -1,11 +1,8 @@
-// The Weaver, the player's spark: movement, the spool's reach, hearts and the grace after a hit.
-import { FIELD, WEAVER } from './config.js';
+// The Weaver: movement, reach, hearts and the grace after a hit.
+import { FIELD, LOOM, WEAVER } from './config.js';
 
 export function createWeaver() {
-  return {
-    x: FIELD.width / 2, y: FIELD.height / 2 + 30, vx: 0, vy: 0, radius: WEAVER.radius, reach: WEAVER.reach, speedMult: 1,
-    hearts: WEAVER.hearts, maxHearts: WEAVER.hearts, invulnerable: 0, shield: 0, pulse: 0, trail: [],
-  };
+  return { x: LOOM.x, y: LOOM.y + 160, vx: 0, vy: 0, radius: WEAVER.radius, reach: WEAVER.reach, speedMult: 1, hearts: WEAVER.hearts, maxHearts: WEAVER.hearts, invulnerable: 0, shield: 0, pulse: 0, trail: [] };
 }
 
 export function stepWeaver(weaver, control, dt) {
@@ -22,9 +19,7 @@ export function stepWeaver(weaver, control, dt) {
   if (weaver.trail.length > WEAVER.trailLength) weaver.trail.shift();
 }
 
-export function weaverVulnerable(weaver) {
-  return weaver.invulnerable <= 0 && weaver.shield <= 0;
-}
+export const weaverVulnerable = (weaver) => weaver.invulnerable <= 0 && weaver.shield <= 0;
 
 export function hurtWeaver(weaver) {
   weaver.hearts = Math.max(0, weaver.hearts - 1);

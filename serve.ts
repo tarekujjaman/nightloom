@@ -8,6 +8,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('./game', import.meta.url)));
+const tools = resolve(fileURLToPath(new URL('./tools', import.meta.url)));
 const args = process.argv.slice(2);
 const portIndex = args.indexOf('--port');
 const requested = portIndex === -1 ? 8080 : Number(args[portIndex + 1]);
@@ -47,8 +48,10 @@ createServer((request, response) => {
     return;
   }
   if (pathname.endsWith('/')) pathname += 'index.html';
-  const file = resolve(join(root, normalize(pathname)));
-  if (file !== root && !file.startsWith(root + sep)) {
+  // /game/... and /tools/... also resolve, so ?shot= (which imports tools/stage.mjs) works here as under tools/shoot.mjs.
+  const base = pathname.startsWith('/tools/') ? tools : root;
+  const file = resolve(join(base, normalize(pathname.replace(/^\/(game|tools)\//, '/'))));
+  if (file !== base && !file.startsWith(base + sep)) {
     response.writeHead(403).end('forbidden');
     return;
   }

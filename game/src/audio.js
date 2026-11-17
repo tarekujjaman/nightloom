@@ -1,8 +1,27 @@
-// Every sound, synthesised with the Web Audio API: drone, plucks, snap chord, capture arpeggios, hits, cuts and fanfares.
+// Every sound, synthesised with the Web Audio API. Rows: T tone(freq, gain, decay, type, hold, when, slideTo, slideTime) · N noise(gain, duration, freq, sweepTo, q, filter, when) · A arpeggio(notes, step, tone args).
 
 const PENTATONIC = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
+const SOUNDS = {
+  snap: [['A', [523.25, 659.25, 783.99, 1046.5], 0.035, 0.14, 0.5, 'triangle'], ['N', 0.08, 0.35, 600, 4000, 0.7]],
+  burn: [['N', 0.07, 0.18, 3000, 800, 2], ['T', 740, 0.05, 0.12, 'sine', 0, 0, 300, 0.12]],
+  hit: [['T', 160, 0.22, 0.35, 'sawtooth', 0, 0, 40, 0.3], ['N', 0.2, 0.3, 900, 200, 1, 'lowpass']],
+  cut: [['N', 0.16, 0.12, 5000, 1500, 3], ['T', 1200, 0.05, 0.1, 'square', 0, 0, 300, 0.1]],
+  release: [['T', 440, 0.05, 0.2, 'sine', 0, 0, 220]],
+  pluck: [['T', 220, 0.2, 0.5, 'triangle', 0, 0, 196, 0.4], ['T', 660, 0.06, 0.12, 'sawtooth'], ['N', 0.1, 0.25, 900, 2600, 1.2]],
+  lance: [['N', 0.12, 0.3, 700, 5000, 1.5], ['T', 1760, 0.1, 0.3, 'triangle', 0, 0.04, 2600]],
+  star: [['A', [659.25, 987.77, 1318.51], 0.07, 0.12, 0.6, 'triangle'], ['N', 0.05, 0.5, 3000, 8000, 0.8]],
+  deny: [['T', 180, 0.06, 0.12, 'square', 0.05], ['T', 150, 0.06, 0.15, 'square', 0.05, 0.1]],
+  realm: [['A', [196, 293.66, 392, 587.33], 0.16, 0.09, 1.6, 'triangle', 0.5], ['N', 0.04, 2, 600, 4000, 0.6]],
+  veil: [['T', 220, 0.14, 0.6, 'sawtooth', 0, 0, 110, 0.5], ['A', [880, 1108.73, 1318.51], 0.05, 0.1, 0.5, 'sine', 0, 0.08]],
+  slow: [['T', 880, 0.1, 1.2, 'sine', 0.1, 0, 220, 1], ['N', 0.05, 0.8, 2000, 200, 1, 'lowpass']],
+  select: [['T', 880, 0.1, 0.12], ['T', 1320, 0.08, 0.2, 'sine', 0, 0.06]],
+  clear: [['A', [659.25, 783.99, 1046.5], 0.09, 0.12, 0.45, 'triangle']],
+  victory: [['A', [261.63, 329.63, 392, 523.25, 659.25, 783.99, 1046.5], 0.11, 0.1, 1.6, 'triangle', 0.6], ['N', 0.05, 1.5, 1200, 6000, 0.5]],
+  defeat: [['A', [392, 349.23, 311.13, 261.63], 0.3, 0.08, 0.6, 'sawtooth', 0.1], ['T', 65.4, 0.15, 1.5, 'sine', 0.3, 1.1]],
+  fanfare: [['A', [392, 523.25, 659.25, 783.99], 0.13, 0.08, 0.35, 'square', 0.08]],
+  bossFanfare: [['A', [261.63, 311.13, 392, 466.16, 523.25], 0.13, 0.08, 0.35, 'square', 0.08], ['N', 0.1, 1.2, 300, 60, 1, 'lowpass']],
+};
 
-/** The audio system; nothing is created until `unlock()` runs inside a user gesture. */
 export function createAudio() {
   let context = null;
   let master = null;
@@ -10,9 +29,8 @@ export function createAudio() {
 
   function unlock() {
     if (!context) {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      context = new Ctx();
+      if (!window.AudioContext) return;
+      context = new AudioContext();
       master = context.createGain();
       master.gain.value = muted ? 0 : 0.6;
       master.connect(context.destination);
@@ -21,7 +39,7 @@ export function createAudio() {
     if (context.state === 'suspended') context.resume().catch(() => {});
   }
 
-  function tone({ freq, type = 'sine', hold = 0, decay = 0.25, gain = 0.2, when = 0, slideTo = null, slideTime = 0.2 }) {
+  function tone(freq, gain, decay, type = 'sine', hold = 0, when = 0, slideTo = null, slideTime = 0.2) {
     if (!context || muted) return;
     const t0 = context.currentTime + when;
     const osc = context.createOscillator();
@@ -38,7 +56,7 @@ export function createAudio() {
     osc.stop(t0 + hold + decay + 0.06);
   }
 
-  function noise({ duration = 0.2, gain = 0.15, filter = 'bandpass', freq = 2000, q = 1, when = 0, sweepTo = null }) {
+  function noise(gain, duration, freq, sweepTo = null, q = 1, filter = 'bandpass', when = 0) {
     if (!context || muted) return;
     const t0 = context.currentTime + when;
     const buffer = context.createBuffer(1, Math.max(1, Math.floor(context.sampleRate * duration)), context.sampleRate);
@@ -82,16 +100,7 @@ export function createAudio() {
     voice('sawtooth', 55, low, -6);
     voice('sawtooth', 55, low, 7);
     voice('triangle', 82.4, low);
-    low.connect(out);
-    const shimmer = context.createGain();
-    shimmer.gain.value = 0.012;
-    const tremolo = context.createGain();
-    tremolo.gain.value = 0.01;
-    tremolo.connect(shimmer.gain);
-    voice('sine', 0.21, tremolo);
-    voice('sine', 329.6, shimmer);
-    shimmer.connect(out);
-    out.connect(master);
+    low.connect(out).connect(master);
   }
 
   return {
@@ -104,70 +113,33 @@ export function createAudio() {
       if (master) master.gain.setTargetAtTime(muted ? 0 : 0.6, context.currentTime, 0.02);
       return muted;
     },
+    play(name) {
+      for (const [kind, ...a] of SOUNDS[name]) {
+        if (kind === 'A') a[0].forEach((freq, i) => tone(freq, a[2], a[3], a[4], a[5], (a[6] || 0) + i * a[1]));
+        else if (kind === 'N') noise(...a);
+        else tone(...a);
+      }
+    },
     playAnchor(index) {
       const freq = PENTATONIC[Math.min(PENTATONIC.length - 1, index)];
-      tone({ freq, type: 'triangle', decay: 0.35, gain: 0.18 });
-      tone({ freq: freq * 2, decay: 0.18, gain: 0.06 });
-    },
-    playSnap() {
-      [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => tone({ freq, type: 'triangle', when: i * 0.035, decay: 0.5, gain: 0.14 }));
-      noise({ duration: 0.35, gain: 0.08, freq: 600, sweepTo: 4000, q: 0.7 });
+      tone(freq, 0.18, 0.35, 'triangle');
+      tone(freq * 2, 0.06, 0.18);
     },
     playCapture(count, multiplier) {
       const steps = Math.min(8, Math.max(1, count));
       const lift = Math.min(4, Math.floor(multiplier / 6));
       for (let i = 0; i < steps; i += 1) {
         const freq = PENTATONIC[Math.min(PENTATONIC.length - 1, i + lift)];
-        tone({ freq, when: 0.05 + i * 0.06, decay: 0.3, gain: 0.16 });
-        tone({ freq: freq * 2, when: 0.05 + i * 0.06, decay: 0.15, gain: 0.05 });
+        tone(freq, 0.16, 0.3, 'sine', 0, 0.05 + i * 0.06);
+        tone(freq * 2, 0.05, 0.15, 'sine', 0, 0.05 + i * 0.06);
       }
-      if (count >= 4) tone({ freq: 1568, when: 0.1 + steps * 0.06, decay: 0.8, gain: 0.12 });
+      if (count >= 4) tone(1568, 0.12, 0.8, 'sine', 0, 0.1 + steps * 0.06);
     },
-    playBurn() {
-      noise({ duration: 0.18, gain: 0.07, freq: 3000, sweepTo: 800, q: 2 });
-      tone({ freq: 740, decay: 0.12, gain: 0.05, slideTo: 300, slideTime: 0.12 });
-    },
-    playHit() {
-      tone({ freq: 160, type: 'sawtooth', decay: 0.35, gain: 0.22, slideTo: 40, slideTime: 0.3 });
-      noise({ duration: 0.3, gain: 0.2, filter: 'lowpass', freq: 900, sweepTo: 200 });
-    },
-    playCut() {
-      noise({ duration: 0.12, gain: 0.16, freq: 5000, sweepTo: 1500, q: 3 });
-      tone({ freq: 1200, type: 'square', decay: 0.1, gain: 0.05, slideTo: 300, slideTime: 0.1 });
-    },
-    playRelease() {
-      tone({ freq: 440, decay: 0.2, gain: 0.05, slideTo: 220, slideTime: 0.2 });
-    },
-    playFanfare(boss) {
-      const notes = boss ? [261.63, 311.13, 392, 466.16, 523.25] : [392, 523.25, 659.25, 783.99];
-      notes.forEach((freq, i) => {
-        tone({ freq, type: 'square', when: i * 0.13, hold: 0.08, decay: 0.3, gain: 0.07 });
-        tone({ freq: freq / 2, type: 'triangle', when: i * 0.13, hold: 0.08, decay: 0.3, gain: 0.08 });
-      });
-      if (boss) noise({ duration: 1.2, gain: 0.1, filter: 'lowpass', freq: 300, sweepTo: 60 });
-    },
-    playVeil() {
-      tone({ freq: 220, type: 'sawtooth', decay: 0.6, gain: 0.14, slideTo: 110, slideTime: 0.5 });
-      [880, 1108.73, 1318.51].forEach((freq, i) => tone({ freq, when: 0.08 + i * 0.05, decay: 0.5, gain: 0.1 }));
-    },
-    playSlow() {
-      tone({ freq: 880, hold: 0.1, decay: 1.2, gain: 0.1, slideTo: 220, slideTime: 1.0 });
-      noise({ duration: 0.8, gain: 0.05, filter: 'lowpass', freq: 2000, sweepTo: 200 });
-    },
-    playSelect() {
-      tone({ freq: 880, decay: 0.12, gain: 0.1 });
-      tone({ freq: 1320, when: 0.06, decay: 0.2, gain: 0.08 });
-    },
-    playClear() {
-      [659.25, 783.99, 1046.5].forEach((freq, i) => tone({ freq, type: 'triangle', when: i * 0.09, decay: 0.45, gain: 0.12 }));
-    },
-    playVictory() {
-      [261.63, 329.63, 392, 523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => tone({ freq, type: 'triangle', when: i * 0.11, hold: 0.6, decay: 1.6, gain: 0.1 }));
-      noise({ duration: 1.5, gain: 0.05, freq: 1200, sweepTo: 6000, q: 0.5 });
-    },
-    playDefeat() {
-      [392, 349.23, 311.13, 261.63].forEach((freq, i) => tone({ freq, type: 'sawtooth', when: i * 0.3, hold: 0.1, decay: 0.6, gain: 0.08 }));
-      tone({ freq: 65.4, when: 1.1, hold: 0.3, decay: 1.5, gain: 0.15 });
+    playLoomHit(fraction) {
+      noise(0.14, 0.16, 1800, 300, 2.5);
+      tone(196, 0.12, 0.4, 'sawtooth', 0, 0, 70, 0.35);
+      tone(880, 0.08, 0.25, 'triangle', 0, 0, 440);
+      if (fraction < 0.3) tone(110, 0.05, 0.4, 'square', 0.1, 0.1);
     },
   };
 }
