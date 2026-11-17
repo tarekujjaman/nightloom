@@ -6,12 +6,12 @@ export const UPGRADES = [
   { id: 'reach', name: 'Long Reach', rarity: 'common', max: 3, blurb: 'Threads anchor to stars farther from the Weaver.', effect: '+90 reach', stat: (lv) => `reach ${WEAVER.reach + 90 * lv} px` },
   { id: 'swift', name: 'Swift Spark', rarity: 'common', max: 3, blurb: 'The Weaver flies a quarter faster.', effect: '+25% speed', stat: (lv) => `speed ${Math.round(100 * 1.25 ** lv)}%` },
   { id: 'heart', name: 'Another Heart', rarity: 'common', max: 3, blurb: 'One more heart, and one healed now.', effect: '+1 heart', stat: (lv) => `${WEAVER.hearts + lv} hearts` },
-  { id: 'ember', name: 'Ember Thread', rarity: 'rare', max: 1, blurb: 'Moths that linger on a held thread burn away.', effect: 'threads burn', stat: (lv) => (lv ? 'burns a moth in 0.55 s' : 'threads do not burn') },
-  { id: 'still', name: 'Still Time', rarity: 'rare', max: 2, blurb: 'Space slows every moth to a crawl for a few seconds.', effect: 'SPACE: still time', stat: (lv) => (lv ? `${SLOW_TIME.duration + 2 * (lv - 1)} s slow · ${Math.max(6, SLOW_TIME.cooldown - 4 * (lv - 1))} s recharge` : 'not held yet') },
-  { id: 'shield', name: 'Star Shield', rarity: 'rare', max: 1, blurb: 'Closing a loop shields the Weaver for 2.5 s.', effect: 'shield on snap', stat: (lv) => (lv ? '2.5 s shield per loop' : 'no shield') },
-  { id: 'steady', name: 'Steady Hand', rarity: 'rare', max: 1, blurb: 'Cutters need twice as long to sever a thread.', effect: 'slow cutters', stat: (lv) => `cut takes ${lv ? 1.8 : 0.8} s` },
-  { id: 'net', name: 'Wide Net', rarity: 'rare', max: 1, blurb: 'Loops also catch moths just outside the thread.', effect: '+40 px catch', stat: (lv) => `catch margin ${lv ? 40 : 0} px` },
-  { id: 'gold', name: 'Gold Weave', rarity: 'epic', max: 1, blurb: 'Every loop scores one tier higher.', effect: '+1 tier', stat: (lv) => (lv ? 'tier +1 on every loop' : 'tiers by area alone') },
+  { id: 'ember', name: 'Ember Thread', rarity: 'rare', max: 1, blurb: 'Moths that linger on a held thread burn away.', effect: 'threads burn', stat: () => 'burns a moth in 0.55 s' },
+  { id: 'still', name: 'Still Time', rarity: 'rare', max: 2, blurb: 'Space slows every moth to a crawl for a few seconds.', effect: 'SPACE: still time', stat: (lv) => `${SLOW_TIME.duration + 2 * (lv - 1)} s slow · ${Math.max(6, SLOW_TIME.cooldown - 4 * (lv - 1))} s recharge` },
+  { id: 'shield', name: 'Star Shield', rarity: 'rare', max: 1, blurb: 'Closing a loop shields the Weaver for 2.5 s.', effect: 'shield on snap', stat: () => '2.5 s shield per loop' },
+  { id: 'steady', name: 'Steady Hand', rarity: 'rare', max: 1, blurb: 'Cutters need twice as long to sever a thread.', effect: 'slow cutters', stat: () => 'cut takes 1.8 s' },
+  { id: 'net', name: 'Wide Net', rarity: 'rare', max: 1, blurb: 'Loops also catch moths just outside the thread.', effect: '+40 px catch', stat: () => 'catch margin 40 px' },
+  { id: 'gold', name: 'Gold Weave', rarity: 'epic', max: 1, blurb: 'Every loop scores one tier higher.', effect: '+1 tier', stat: () => 'tier +1 on every loop' },
 ];
 
 export const RELICS = [
@@ -24,19 +24,14 @@ export const RELICS = [
 export const RARITY_COLORS = { common: '#74f3ff', rare: '#b48cff', epic: '#ffd36b', relic: '#ff6ad5' };
 const ROMAN = ['', 'I', 'II', 'III'];
 
-/** Fresh counts of every card: none held. */
 export function emptyUpgrades() {
-  const held = {};
-  for (const card of [...UPGRADES, ...RELICS]) held[card.id] = 0;
-  return held;
+  return Object.fromEntries([...UPGRADES, ...RELICS].map((card) => [card.id, 0]));
 }
 
-/** The definition of a card by id. */
 export function upgradeById(id) {
-  return UPGRADES.find((card) => card.id === id) || RELICS.find((card) => card.id === id);
+  return [...UPGRADES, ...RELICS].find((card) => card.id === id);
 }
 
-/** True when the wave just cleared earns a relic choice instead of a thread. */
 export function offersRelic(wave, held) {
   return wave === RELIC_WAVE && !RELICS.some((relic) => held[relic.id] > 0);
 }
@@ -47,7 +42,6 @@ export function offerCards(random, held, wave) {
   return random.shuffle(pool.map((card) => card.id)).slice(0, 3);
 }
 
-/** Apply the card `id` to the world and count it as held. */
 export function applyUpgrade(world, id) {
   world.upgrades[id] = (world.upgrades[id] || 0) + 1;
   const weaver = world.weaver;
@@ -69,12 +63,10 @@ export function applyUpgrade(world, id) {
   }
 }
 
-/** The cards held, for the HUD: name with its level, rarity and current stat line. */
+/** The cards held, for the HUD: name with level, rarity and the stat line at that level. */
 export function heldCards(held) {
-  const rows = [];
-  for (const card of [...UPGRADES, ...RELICS]) {
-    const level = held[card.id] || 0;
-    if (level > 0) rows.push({ id: card.id, name: card.max > 1 ? `${card.name} ${ROMAN[level] || level}` : card.name, rarity: card.rarity, stat: card.stat(level) });
-  }
-  return rows;
+  return [...UPGRADES, ...RELICS].filter((card) => held[card.id] > 0).map((card) => {
+    const level = held[card.id];
+    return { id: card.id, name: card.max > 1 ? `${card.name} ${ROMAN[level] || level}` : card.name, rarity: card.rarity, stat: card.stat(level) };
+  });
 }

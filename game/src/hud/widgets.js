@@ -2,7 +2,6 @@
 import { PALETTE } from '../config.js';
 import { glowText, heartPath, measureText, rgba, roundRect } from '../glow.js';
 
-/** A solid dark pill; `stroke` colours its outline. */
 export function pill(ctx, x, y, w, h, stroke = PALETTE.panelLine, fill = PALETTE.panel, lineWidth = 2) {
   roundRect(ctx, x, y, w, h, Math.min(14, h / 2));
   ctx.fillStyle = fill;
@@ -14,7 +13,6 @@ export function pill(ctx, x, y, w, h, stroke = PALETTE.panelLine, fill = PALETTE
   }
 }
 
-/** The width `tag` uses for `text`. */
 export function tagWidth(ctx, text, size = 13, pad = 9) {
   return measureText(ctx, text, { size, letterSpacing: 1.5 }) + pad * 2;
 }
@@ -29,12 +27,10 @@ export function tag(ctx, text, x, y, color, size = 13, pad = 9) {
   return w;
 }
 
-/** A tag centred on cx. */
 export function tagCentred(ctx, text, cx, y, color, size = 13, pad = 9) {
   tag(ctx, text, cx - tagWidth(ctx, text, size, pad) / 2, y, color, size, pad);
 }
 
-/** A horizontal meter with a dark trough, filled to `fraction` with `color`. */
 export function meter(ctx, x, y, w, h, fraction, color) {
   roundRect(ctx, x, y, w, h, h / 2);
   ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
@@ -46,7 +42,6 @@ export function meter(ctx, x, y, w, h, fraction, color) {
   }
 }
 
-/** `filled` of `total` segments lit in `color`, for boss veils. */
 export function segments(ctx, x, y, w, h, filled, total, color) {
   const sw = (w - 4 * (total - 1)) / total;
   for (let i = 0; i < total; i += 1) {
@@ -56,7 +51,6 @@ export function segments(ctx, x, y, w, h, filled, total, color) {
   }
 }
 
-/** Key caps and what they do in a row from x; returns the width used. */
 export function keyStrip(ctx, items, x, y, size = 14, color = PALETTE.gold) {
   let cx = x;
   for (const [key, what] of items) {
@@ -67,7 +61,6 @@ export function keyStrip(ctx, items, x, y, size = 14, color = PALETTE.gold) {
   return cx - x;
 }
 
-/** `hearts` filled of `max` in a row from x, each `size` wide; the lost one blinks ember while `hurt`. */
 export function heartRow(ctx, x, y, hearts, max, size, hurt = false, time = 0) {
   for (let i = 0; i < max; i += 1) {
     const hx = x + size / 2 + i * (size + 6);

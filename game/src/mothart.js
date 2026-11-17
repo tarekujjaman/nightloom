@@ -1,18 +1,22 @@
-// How each void-moth looks (violet wings, pale outline, ember eyes), its field label and its HUD icon.
+// What each void-moth is called and does, and how it looks (violet wings, pale outline, ember eyes) in the field and as a HUD icon.
 import { LOOM, MOTHS, PALETTE } from './config.js';
-import { drawSprite, glowText, makeGlowSprite, measureText, roundRect } from './glow.js';
-import { MOTH_INFO } from './bestiary.js';
+import { drawSprite, makeGlowSprite } from './glow.js';
+
+export const MOTH_INFO = {
+  drifter: { name: 'Drifter', does: 'wanders toward you', color: '#d9ccff' },
+  dasher: { name: 'Dasher', does: 'aims, then lunges', color: '#ff8a45' },
+  splitter: { name: 'Splitter', does: 'sheds mites until caught', color: '#ff6ad5' },
+  mite: { name: 'Mite', does: 'small and quick', color: '#d9ccff' },
+  cutter: { name: 'Cutter', does: 'cuts your held thread', color: '#ff5a5a' },
+  phantom: { name: 'Phantom', does: 'fades out of loops', color: '#b48cff' },
+  warden: { name: 'Hex Warden', does: 'shields moths near it', color: '#74f3ff' },
+  eclipse: { name: 'Eclipse Moth', does: 'boss · 3 veils, 3 phases', color: '#ffd36b' },
+  queen: { name: 'Hollow Queen', does: 'boss · 5 veils, lunges in Fury', color: '#ffd36b' },
+};
+export const MOTH_ORDER = ['eclipse', 'queen', 'warden', 'cutter', 'phantom', 'splitter', 'dasher', 'drifter', 'mite'];
 
 const DRAW_SCALE = 1.25;
 let sprites = null;
-
-function ensureSprites() {
-  if (sprites) return;
-  sprites = {
-    aura: makeGlowSprite(PALETTE.mothAura, 40, 0.3), eye: makeGlowSprite(PALETTE.ember, 14, 0.15), burn: makeGlowSprite(PALETTE.emberGlow, 48, 0.05),
-    corona: makeGlowSprite(PALETTE.gold, 140, 0.02), belly: makeGlowSprite(PALETTE.ember, 30, 0.1), shield: makeGlowSprite(PALETTE.cyan, 60, 0.02),
-  };
-}
 
 function dashedCircle(ctx, x, y, r, color, width, dash, offset = 0) {
   ctx.strokeStyle = color;
@@ -27,7 +31,12 @@ function dashedCircle(ctx, x, y, r, color, width, dash, offset = 0) {
 
 /** Draw `moth` at its place in the world; `time` drives pulses and flickers. */
 export function drawMoth(ctx, moth, time) {
-  ensureSprites();
+  if (!sprites) {
+    sprites = {
+      aura: makeGlowSprite(PALETTE.mothAura, 40, 0.3), eye: makeGlowSprite(PALETTE.ember, 14, 0.15), burn: makeGlowSprite(PALETTE.emberGlow, 48, 0.05),
+      corona: makeGlowSprite(PALETTE.gold, 140, 0.02), belly: makeGlowSprite(PALETTE.ember, 30, 0.1), shield: makeGlowSprite(PALETTE.cyan, 60, 0.02),
+    };
+  }
   if (moth.wake.length > 1) drawDashWake(ctx, moth);
   const flap = 0.5 + 0.5 * Math.abs(Math.sin(moth.flap));
   ctx.save();
@@ -67,22 +76,6 @@ export function drawMoth(ctx, moth, time) {
     ctx.stroke();
   }
   ctx.restore();
-}
-
-/** The kind's name in a solid pill under the moth, with what it does the first time a kind appears (`explained`); mites go unlabelled. */
-export function drawMothLabel(ctx, moth, explained) {
-  if (moth.kind === 'mite' || moth.visible < 0.6) return;
-  const info = MOTH_INFO[moth.kind];
-  const full = !moth.boss && moth.kind !== 'drifter' && !explained.has(moth.kind);
-  explained.add(moth.kind);
-  const text = full ? `${info.name.toUpperCase()} · ${info.does}` : info.name.toUpperCase();
-  const size = moth.boss ? 14 : 12;
-  const width = measureText(ctx, text, { size, letterSpacing: 0.5 }) + 14;
-  const y = moth.y + moth.radius * 1.55 + 12;
-  roundRect(ctx, moth.x - width / 2, y - 10, width, 20, 10);
-  ctx.fillStyle = 'rgba(16, 6, 36, 0.82)';
-  ctx.fill();
-  glowText(ctx, text, moth.x, y + 1, { size, color: info.color, letterSpacing: 0.5 });
 }
 
 /** A moth of `kind` facing up, fitted into a `size` box centred on (x, y), for the HUD and the bestiary. */

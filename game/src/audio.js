@@ -21,12 +21,8 @@ export function createAudio() {
     if (context.state === 'suspended') context.resume().catch(() => {});
   }
 
-  function ready() {
-    return context !== null && !muted;
-  }
-
-  function tone({ freq, type = 'sine', attack = 0.004, hold = 0, decay = 0.25, gain = 0.2, when = 0, slideTo = null, slideTime = 0.2 }) {
-    if (!ready()) return;
+  function tone({ freq, type = 'sine', hold = 0, decay = 0.25, gain = 0.2, when = 0, slideTo = null, slideTime = 0.2 }) {
+    if (!context || muted) return;
     const t0 = context.currentTime + when;
     const osc = context.createOscillator();
     const env = context.createGain();
@@ -34,22 +30,20 @@ export function createAudio() {
     osc.frequency.setValueAtTime(freq, t0);
     if (slideTo !== null) osc.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t0 + slideTime);
     env.gain.setValueAtTime(0.0001, t0);
-    env.gain.exponentialRampToValueAtTime(gain, t0 + attack);
-    if (hold > 0) env.gain.setValueAtTime(gain, t0 + attack + hold);
-    env.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + hold + decay);
-    osc.connect(env);
-    env.connect(master);
+    env.gain.exponentialRampToValueAtTime(gain, t0 + 0.004);
+    if (hold > 0) env.gain.setValueAtTime(gain, t0 + 0.004 + hold);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.004 + hold + decay);
+    osc.connect(env).connect(master);
     osc.start(t0);
-    osc.stop(t0 + attack + hold + decay + 0.05);
+    osc.stop(t0 + hold + decay + 0.06);
   }
 
   function noise({ duration = 0.2, gain = 0.15, filter = 'bandpass', freq = 2000, q = 1, when = 0, sweepTo = null }) {
-    if (!ready()) return;
+    if (!context || muted) return;
     const t0 = context.currentTime + when;
-    const length = Math.max(1, Math.floor(context.sampleRate * duration));
-    const buffer = context.createBuffer(1, length, context.sampleRate);
+    const buffer = context.createBuffer(1, Math.max(1, Math.floor(context.sampleRate * duration)), context.sampleRate);
     const data = buffer.getChannelData(0);
-    for (let i = 0; i < length; i += 1) data[i] = Math.random() * 2 - 1;
+    for (let i = 0; i < data.length; i += 1) data[i] = Math.random() * 2 - 1;
     const source = context.createBufferSource();
     source.buffer = buffer;
     const biquad = context.createBiquadFilter();
@@ -60,9 +54,7 @@ export function createAudio() {
     const env = context.createGain();
     env.gain.setValueAtTime(gain, t0);
     env.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-    source.connect(biquad);
-    biquad.connect(env);
-    env.connect(master);
+    source.connect(biquad).connect(env).connect(master);
     source.start(t0);
     source.stop(t0 + duration + 0.02);
   }
@@ -74,7 +66,6 @@ export function createAudio() {
     osc.detune.value = detune;
     osc.connect(destination);
     osc.start();
-    return osc;
   }
 
   function startDrone() {
@@ -84,22 +75,22 @@ export function createAudio() {
     low.type = 'lowpass';
     low.frequency.value = 180;
     low.Q.value = 2;
-    const lfoGain = context.createGain();
-    lfoGain.gain.value = 90;
-    lfoGain.connect(low.frequency);
-    voice('sine', 0.07, lfoGain);
+    const lfo = context.createGain();
+    lfo.gain.value = 90;
+    lfo.connect(low.frequency);
+    voice('sine', 0.07, lfo);
     voice('sawtooth', 55, low, -6);
     voice('sawtooth', 55, low, 7);
     voice('triangle', 82.4, low);
     low.connect(out);
-    const shimmerGain = context.createGain();
-    shimmerGain.gain.value = 0.012;
-    const tremoloGain = context.createGain();
-    tremoloGain.gain.value = 0.01;
-    tremoloGain.connect(shimmerGain.gain);
-    voice('sine', 0.21, tremoloGain);
-    voice('sine', 329.6, shimmerGain);
-    shimmerGain.connect(out);
+    const shimmer = context.createGain();
+    shimmer.gain.value = 0.012;
+    const tremolo = context.createGain();
+    tremolo.gain.value = 0.01;
+    tremolo.connect(shimmer.gain);
+    voice('sine', 0.21, tremolo);
+    voice('sine', 329.6, shimmer);
+    shimmer.connect(out);
     out.connect(master);
   }
 

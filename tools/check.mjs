@@ -115,7 +115,7 @@ async function main() {
 
     console.log('hud');
     const rows = await call("const { threatRows } = await import('./src/hud/sidepanel.js'); return threatRows(w);");
-    const left = await call("const { mothsLeft } = await import('./src/hud/topbar.js'); return mothsLeft(w);");
+    const left = await call("const { mothsLeft } = await import('./src/hud/bars.js'); return mothsLeft(w);");
     expect(rows.length > 0 && rows.every((row) => row.kind && row.count > 0), `the threat queue lists ${rows.map((row) => `${row.kind} ×${row.count}`).join(', ')}`);
     expect(rows.reduce((sum, row) => sum + row.count, 0) === left, `its counts add up to the ${left} moths left in the wave banner`);
     const grade = await read('g.grade()');

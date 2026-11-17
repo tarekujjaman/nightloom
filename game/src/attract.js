@@ -5,7 +5,6 @@ import { pointInPolygon, polygonArea, polygonCentroid } from './threads.js';
 const CURSOR_SPEED = 620;
 const WEAVE_TIMEOUT = 7;
 
-/** A fresh pilot, about to choose its first loop. */
 export function createAttractPilot() {
   return {
     phase: 'choose', cluster: [], index: 0, timer: 0.6, elapsed: 0, recent: [], loopsAtStart: 0, targetX: FIELD.width / 2, targetY: FIELD.height / 2,
@@ -18,11 +17,7 @@ function orderByAngle(stars, indices) {
   return indices.slice().sort((a, b) => Math.atan2(stars[a].y - centre.y, stars[a].x - centre.x) - Math.atan2(stars[b].y - centre.y, stars[b].x - centre.x));
 }
 
-function overlap(a, b) {
-  return a.filter((star) => b.includes(star)).length;
-}
-
-/** The cluster of 4 to 6 stars, all within the Weaver's reach of their middle, whose loop would enclose the most moths (then the largest); clusters sharing. */
+/** The cluster of 4 to 6 stars within reach of their middle whose loop would enclose the most moths (then the largest), none sharing half its stars with a `recent` one. */
 export function chooseCluster(state, recent = []) {
   const { stars, moths, weaver } = state;
   let best = null;
@@ -31,12 +26,11 @@ export function chooseCluster(state, recent = []) {
     for (const size of [4, 5, 6]) {
       if (byDistance.length < size) continue;
       const ordered = orderByAngle(stars, byDistance.slice(0, size));
-      if (recent.some((cluster) => overlap(cluster, ordered) * 2 > Math.min(cluster.length, ordered.length))) continue;
+      if (recent.some((cluster) => cluster.filter((star) => ordered.includes(star)).length * 2 > Math.min(cluster.length, ordered.length))) continue;
       const polygon = ordered.map((i) => stars[i]);
       const centre = polygonCentroid(polygon);
       if (polygon.some((p) => Math.hypot(p.x - centre.x, p.y - centre.y) > weaver.reach - 24)) continue;
-      let count = 0;
-      for (const moth of moths) if (moth.alive && !moth.boss && pointInPolygon(moth.x, moth.y, polygon)) count += 1;
+      const count = moths.filter((moth) => moth.alive && !moth.boss && pointInPolygon(moth.x, moth.y, polygon)).length;
       const score = count * 100000 + polygonArea(polygon) / 100;
       if (!best || score > best.score) best = { score, cluster: ordered, centre, count };
     }

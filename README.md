@@ -21,8 +21,11 @@ one-line behaviour and count, the boss with its veils and phase, and what spawns
 **THREADS HELD** lists the cards taken with their level and live stat. The bottom bar has the
 hearts, the still-time meter, the combo meter, the high score, the run grade (S to D, the score
 against par) and a strip of key caps. A boss bar crosses the top of the field while a boss lives,
-every moth wears a label naming its kind and what it does, and every catch raises a **LOOP CLOSED**
-callout with the points, the tier, the catch, the multiplier and the chain.
+and a **NOW** line along its foot says what to do right now, changing with the wave, the boss
+phase and the thread in hand. The first moth of each kind on screen wears a label naming it and
+what it does and the rest a short name, each placed clear of the others, the stars and the HUD's
+words; every catch raises a **LOOP CLOSED** callout with the points, the tier, the catch, the
+multiplier and the chain.
 
 ## Controls
 

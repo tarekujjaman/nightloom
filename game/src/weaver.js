@@ -1,7 +1,6 @@
 // The Weaver, the player's spark: movement, the spool's reach, hearts and the grace after a hit.
 import { FIELD, WEAVER } from './config.js';
 
-/** A fresh Weaver at the centre of the field with full hearts. */
 export function createWeaver() {
   return {
     x: FIELD.width / 2, y: FIELD.height / 2 + 30, vx: 0, vy: 0, radius: WEAVER.radius, reach: WEAVER.reach, speedMult: 1,
@@ -9,7 +8,6 @@ export function createWeaver() {
   };
 }
 
-/** Move by `control` for `dt` seconds, easing toward the wanted velocity and staying in the field. */
 export function stepWeaver(weaver, control, dt) {
   const speed = WEAVER.speed * weaver.speedMult;
   const ease = 1 - Math.exp(-dt * 14);
@@ -24,19 +22,16 @@ export function stepWeaver(weaver, control, dt) {
   if (weaver.trail.length > WEAVER.trailLength) weaver.trail.shift();
 }
 
-/** True when a moth can hurt the Weaver right now. */
 export function weaverVulnerable(weaver) {
   return weaver.invulnerable <= 0 && weaver.shield <= 0;
 }
 
-/** Take one heart and start the grace period; returns true when no hearts are left. */
 export function hurtWeaver(weaver) {
   weaver.hearts = Math.max(0, weaver.hearts - 1);
   weaver.invulnerable = WEAVER.invulnerable;
   return weaver.hearts === 0;
 }
 
-/** Grow the heart capacity by one and fill the new heart. */
 export function growHearts(weaver) {
   weaver.maxHearts = Math.min(WEAVER.maxHearts, weaver.maxHearts + 1);
   weaver.hearts = Math.min(weaver.maxHearts, weaver.hearts + 1);

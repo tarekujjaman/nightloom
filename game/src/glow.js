@@ -3,12 +3,10 @@
 export const FONT_TITLE = "'Palatino Linotype', Palatino, Georgia, serif";
 export const FONT_UI = "'Segoe UI', 'Trebuchet MS', Arial, sans-serif";
 
-/** '#rrggbb' to 'rgba(r, g, b, alpha)'. */
 export function rgba(hex, alpha) {
   return `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${alpha})`;
 }
 
-/** A canvas holding a soft disc of `color` fading to nothing at `radius`. */
 export function makeGlowSprite(color, radius, core = 0.08) {
   const size = Math.ceil(radius * 2) + 2;
   const sprite = document.createElement('canvas');
@@ -26,7 +24,6 @@ export function makeGlowSprite(color, radius, core = 0.08) {
   return sprite;
 }
 
-/** Stamp a sprite centred on (x, y). */
 export function drawSprite(ctx, sprite, x, y, scale = 1, alpha = 1) {
   if (alpha <= 0) return;
   const w = sprite.width * scale;
@@ -38,12 +35,12 @@ export function drawSprite(ctx, sprite, x, y, scale = 1, alpha = 1) {
 }
 
 /** Text with an optional coloured halo (`glow`, spread `blur`) and/or a solid dark `outline`. */
-export function glowText(ctx, text, x, y, { font = FONT_UI, size = 20, weight = '800', color = '#ffffff', glow = null, blur = 12, align = 'center', baseline = 'middle', alpha = 1, letterSpacing = 0, outline = null } = {}) {
+export function glowText(ctx, text, x, y, { font = FONT_UI, size = 20, weight = '800', color = '#ffffff', glow = null, blur = 12, align = 'center', alpha = 1, letterSpacing = 0, outline = null } = {}) {
   ctx.save();
   ctx.globalAlpha *= alpha;
   ctx.font = `${weight} ${size}px ${font}`;
   ctx.textAlign = align;
-  ctx.textBaseline = baseline;
+  ctx.textBaseline = 'middle';
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${letterSpacing}px`;
   if (outline) {
     ctx.lineJoin = 'round';
@@ -62,7 +59,6 @@ export function glowText(ctx, text, x, y, { font = FONT_UI, size = 20, weight = 
   ctx.restore();
 }
 
-/** Width of `text` at the given font, for layout. */
 export function measureText(ctx, text, { font = FONT_UI, size = 20, weight = '800', letterSpacing = 0 } = {}) {
   ctx.save();
   ctx.font = `${weight} ${size}px ${font}`;
@@ -72,7 +68,6 @@ export function measureText(ctx, text, { font = FONT_UI, size = 20, weight = '80
   return width;
 }
 
-/** Break `text` into lines no wider than `maxWidth`. */
 export function wrapText(ctx, text, maxWidth, fontSpec) {
   const lines = [];
   let line = '';
@@ -87,7 +82,6 @@ export function wrapText(ctx, text, maxWidth, fontSpec) {
   return lines;
 }
 
-/** A rounded rectangle path (not filled or stroked). */
 export function roundRect(ctx, x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
   ctx.beginPath();
@@ -99,7 +93,6 @@ export function roundRect(ctx, x, y, width, height, radius) {
   ctx.closePath();
 }
 
-/** A four-pointed sparkle path centred on (x, y). */
 export function sparklePath(ctx, x, y, radius, pinch = 0.28, rotation = 0) {
   ctx.beginPath();
   for (let i = 0; i < 8; i += 1) {
@@ -110,7 +103,6 @@ export function sparklePath(ctx, x, y, radius, pinch = 0.28, rotation = 0) {
   ctx.closePath();
 }
 
-/** A heart path centred on (x, y), `size` wide. */
 export function heartPath(ctx, x, y, size) {
   const s = size / 2;
   ctx.beginPath();

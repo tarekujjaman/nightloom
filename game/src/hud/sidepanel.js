@@ -1,13 +1,12 @@
-// The side panel: THREAT QUEUE (what is coming, boss veils and phase, what spawns next) and THREADS HELD; the bestiary on the title.
+// The side panel: THREAT QUEUE (what is coming, boss veils and phase, what spawns next) and THREADS HELD; a bestiary on the title.
 import { ARENA, LAYOUT, PALETTE, VIEW } from '../config.js';
 import { glowText } from '../glow.js';
-import { MOTH_INFO, MOTH_ORDER } from '../bestiary.js';
 import { BOSSES, bossPhase } from '../bosses.js';
-import { drawMothIcon } from '../mothart.js';
+import { MOTH_INFO, MOTH_ORDER, drawMothIcon } from '../mothart.js';
 import { RARITY_COLORS, heldCards } from '../upgrades.js';
 import { waveDefinition } from '../waves.js';
 import { PHASE } from '../world.js';
-import { drawUpgradeIcon } from '../screens/icons.js';
+import { drawUpgradeIcon } from '../screens/upgrade.js';
 import { segments, tag } from './widgets.js';
 
 /** The threat queue: one row per kind on the field or still to come, bosses first; `boss` carries the live boss. */
@@ -36,7 +35,7 @@ function row(ctx, x, y, w, kind, count, boss, time) {
   glowText(ctx, info.does, x + 50, y + 31, { size: 12, weight: '700', color: PALETTE.textSoft, align: 'left' });
   if (boss) {
     const phase = bossPhase(boss);
-    tag(ctx, `PHASE ${phase + 1}/3 · ${BOSSES[kind].phases[phase]}`, x + 50, y + 51, PALETTE.magenta, 10, 6);
+    tag(ctx, `PHASE ${phase + 1}/3 · ${BOSSES[kind].phases[phase]}`, x + 50, y + 51, PALETTE.magenta, 11, 6);
     segments(ctx, x + w - 92, y + 16, 84, 10, boss.veils, boss.maxVeils, PALETTE.violet);
     glowText(ctx, `${boss.veils}/${boss.maxVeils} VEILS`, x + w - 8, y + 38, { size: 11, color: PALETTE.violet, align: 'right', letterSpacing: 1 });
   } else if (count > 0) {
@@ -44,7 +43,6 @@ function row(ctx, x, y, w, kind, count, boss, time) {
   }
 }
 
-/** Draw the panel down the right of the view. */
 export function drawSidePanel(ctx, state, ui, title) {
   const x = VIEW.width - LAYOUT.side;
   const y = ARENA.y;
@@ -86,19 +84,13 @@ export function drawSidePanel(ctx, state, ui, title) {
     cy += 28;
   }
 
-  if (title) cy += 10;
+  if (title) cy += 24;
   tag(ctx, 'THREADS HELD', inner, cy, PALETTE.gold, 13);
   cy += 18;
   const held = heldCards(state.upgrades);
-  if (title) {
-    for (const line of ['One card after every wave: 9 threads', 'in 3 rarities, levelled up to III, and', 'a relic after the Eclipse Moth falls.']) {
-      cy += 18;
-      glowText(ctx, line, inner, cy, { size: 12.5, weight: '700', color: PALETTE.textSoft, align: 'left' });
-    }
-    return;
-  }
-  if (held.length === 0) {
-    glowText(ctx, 'none yet · one card after every wave', inner, cy + 16, { size: 12.5, weight: '700', color: PALETTE.textSoft, align: 'left' });
+  if (title || held.length === 0) {
+    const lines = title ? ['One card after every wave: 9 threads', 'in 3 rarities, levelled up to III, and', 'a relic after the Eclipse Moth falls.'] : ['none yet · one card after every wave'];
+    lines.forEach((line, i) => glowText(ctx, line, inner, cy + 16 + i * 18, { size: 12.5, weight: '700', color: PALETTE.textSoft, align: 'left' }));
     return;
   }
   const rowH = Math.max(26, Math.min(36, (y + h - 10 - cy) / held.length));

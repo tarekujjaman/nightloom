@@ -20,7 +20,6 @@ function makeCloud(rgb, radius) {
   return sprite;
 }
 
-/** The sky gradient. */
 export function drawSky(ctx) {
   if (!skyGradient) {
     skyGradient = ctx.createLinearGradient(0, 0, 0, FIELD.height);
@@ -32,7 +31,6 @@ export function drawSky(ctx) {
   ctx.fillRect(0, 0, FIELD.width, FIELD.height);
 }
 
-/** Nebula clouds drifting very slowly, and an aurora band low in the sky. */
 export function drawNebula(ctx, time) {
   if (!clouds) clouds = { violet: makeCloud(PALETTE.nebulaViolet, 240), magenta: makeCloud(PALETTE.nebulaMagenta, 190), teal: makeCloud(PALETTE.nebulaTeal, 220) };
   const t = time * 0.05;
@@ -50,13 +48,11 @@ export function drawNebula(ctx, time) {
   ctx.restore();
 }
 
-/** The backdrop stars, slid by (parallaxX, parallaxY) times each layer's depth, twinkling with time. */
 export function drawBackdropStars(ctx, backdrop, parallaxX, parallaxY, time) {
   ctx.save();
   for (const layer of backdrop) {
     for (const star of layer.stars) {
-      const twinkle = 0.55 + 0.45 * Math.sin(time * star.speed + star.phase);
-      ctx.globalAlpha = layer.alpha * twinkle;
+      ctx.globalAlpha = layer.alpha * (0.55 + 0.45 * Math.sin(time * star.speed + star.phase));
       ctx.fillStyle = star.warm ? '#ffe9b0' : '#eefaff';
       const x = star.x - parallaxX * layer.depth;
       const y = star.y - parallaxY * layer.depth;
@@ -73,11 +69,10 @@ export function drawBackdropStars(ctx, backdrop, parallaxX, parallaxY, time) {
   ctx.restore();
 }
 
-/** Darken the corners a little so the middle of the sky, where the play is, glows brightest. */
-export function drawVignette(ctx, strength = 0.3) {
+export function drawVignette(ctx) {
   const gradient = ctx.createRadialGradient(FIELD.width / 2, FIELD.height / 2, FIELD.height * 0.4, FIELD.width / 2, FIELD.height / 2, FIELD.width * 0.75);
   gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  gradient.addColorStop(1, `rgba(6, 0, 20, ${strength})`);
+  gradient.addColorStop(1, 'rgba(6, 0, 20, 0.3)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, FIELD.width, FIELD.height);
 }

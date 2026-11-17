@@ -1,6 +1,5 @@
 // Sparks, floating labels, screen shake and colour flashes: feedback that is not part of the rules.
 
-/** Empty effect pools. */
 export function createEffects() {
   return { particles: [], texts: [], shake: 0, shakeX: 0, shakeY: 0, redFlash: 0, goldFlash: 0, cyanFlash: 0 };
 }
@@ -17,7 +16,6 @@ export function burst(effects, random, x, y, { count = 16, colors = ['#ffd36b'],
   }
 }
 
-/** Sparks along a polygon's edges when it snaps shut. */
 export function edgeSparks(effects, random, polygon, colors) {
   for (let i = 0; i < polygon.length; i += 1) {
     const a = polygon[i];
@@ -30,17 +28,14 @@ export function edgeSparks(effects, random, polygon, colors) {
   }
 }
 
-/** A label that drifts upward and fades. */
 export function floatText(effects, x, y, text, { color = '#ffd36b', size = 28, life = 1.3, rise = 46 } = {}) {
   effects.texts.push({ x, y, text, color, size, life, age: 0, rise });
 }
 
-/** Kick the screen; the shake decays on its own. */
 export function addShake(effects, amount) {
   effects.shake = Math.min(28, effects.shake + amount);
 }
 
-/** Advance sparks, labels, shake and flashes by `dt`. */
 export function stepEffects(effects, random, dt) {
   for (const p of effects.particles) {
     p.age += dt;

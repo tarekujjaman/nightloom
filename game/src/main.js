@@ -1,5 +1,5 @@
-// Boot and the one loop: input each frame, fixed 1/60 s world steps, then a paint. ?seed=N fixes
-// the night; ?shot=play|title|upgrade|results (with &seed=N) stages that scene for a screenshot.
+// Boot and the one loop: input each frame, fixed 1/60 s world steps, then a paint. ?seed=N fixes the night;
+// ?shot=play|title|upgrade|results (with &seed=N) stages that scene for a screenshot.
 import { STEP } from './config.js';
 import { EVENT, PHASE, chooseUpgrade, createWorld, startWave, stepWorld, worldFinished } from './world.js';
 import { ACTION, createInput } from './input.js';
@@ -7,38 +7,51 @@ import { createAudio } from './audio.js';
 import { SCREEN_PAUSED, SCREEN_PLAY, SCREEN_RESULTS, SCREEN_TITLE, SCREEN_UPGRADE, createRenderer } from './render.js';
 import { upgradeCardAt } from './screens/upgrade.js';
 import { createAttractPilot, pilotControl } from './attract.js';
-import { readHighScore, saveHighScore } from './storage.js';
 import { runGrade } from './scoring.js';
-import { isBossWave } from './waves.js';
+import { waveDefinition } from './waves.js';
 import { stageShot } from './shots.js';
 
 const MAX_FRAME = 0.25;
-
+const BEST_KEY = 'nightloom.best.v1';
 const params = new URLSearchParams(window.location.search);
-const shot = params.get('shot');
 const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
 const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
 const canvas = document.getElementById('game');
 const status = document.getElementById('status');
 const renderer = createRenderer(canvas);
 
+/** The saved high score, or 0; with storage off (private windows) the score lasts this visit only. */
+function readHighScore() {
+  try {
+    const value = Number.parseInt(window.localStorage.getItem(BEST_KEY) ?? '0', 10);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveHighScore(value) {
+  try {
+    window.localStorage.setItem(BEST_KEY, String(Math.round(value)));
+  } catch {
+    // Storage is off: the score stays in memory for this visit.
+  }
+}
+
 function runShot(name) {
   const scene = stageShot(name, seed);
   let painted = 0;
-  function paint() {
+  requestAnimationFrame(function paint() {
     renderer.draw(scene.state, scene.screen, scene.ui);
-    painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
+    if ((painted += 1) < 2) requestAnimationFrame(paint);
     else window.__shotReady = true;
-  }
-  requestAnimationFrame(paint);
+  });
 }
 
 function runGame() {
   const audio = createAudio();
   const input = createInput(canvas, renderer.toLogical);
   input.onFirstGesture(() => audio.unlock());
-
   let gameSeed = seed;
   let world;
   let pilot;
@@ -98,13 +111,13 @@ function runGame() {
     if (events & EVENT.SLOW) audio.playSlow();
     if (events & EVENT.HIT) {
       audio.playHit();
-      announce(world.weaver.hearts === 1 ? 'Hit. 1 heart left.' : `Hit. ${world.weaver.hearts} hearts left.`);
+      announce(`Hit. ${world.weaver.hearts} heart${world.weaver.hearts === 1 ? '' : 's'} left.`);
     }
     if (events & EVENT.CLEAR) {
       audio.playClear();
       announce(`Wave ${world.wave} cleared. Score ${world.score}. Grade ${runGrade(world).letter}.`);
     }
-    if (events & EVENT.WAVE && world.wave > 1) audio.playFanfare(isBossWave(world.wave));
+    if (events & EVENT.WAVE && world.wave > 1) audio.playFanfare(Boolean(waveDefinition(world.wave).boss));
     if (events & EVENT.WON) {
       finishGame();
       audio.playVictory();
@@ -189,10 +202,9 @@ function runGame() {
 
   backToTitle();
   requestAnimationFrame(frame);
-
   // ?debug exposes the state to tools/check.mjs.
   if (params.has('debug')) window.__nightloom = { world: () => world, screen: () => screen, best: () => best, grade: () => runGrade(world) };
 }
 
-if (shot) runShot(shot);
+if (params.get('shot')) runShot(params.get('shot'));
 else runGame();

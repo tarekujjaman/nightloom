@@ -1,15 +1,12 @@
 // Every tuning number, colour and layout box NIGHTLOOM uses, in one place.
 
-/** The 1280x800 view, the HUD frame around the playfield, and the playfield (ARENA) whose own coordinates the world uses (FIELD). */
+/** The 1280x800 view, the HUD frame, and the playfield (ARENA) in whose own coordinates the world lives (FIELD). */
 export const VIEW = { width: 1280, height: 800 };
 export const LAYOUT = { top: 66, side: 312, bottom: 86 };
 export const ARENA = { x: 0, y: LAYOUT.top, width: VIEW.width - LAYOUT.side, height: VIEW.height - LAYOUT.top - LAYOUT.bottom };
 export const FIELD = { width: ARENA.width, height: ARENA.height };
-/** Fixed simulation step in seconds. */
 export const STEP = 1 / 60;
-export const BEST_KEY = 'nightloom.best.v1';
 
-/** Gold and cyan light over a twilight-violet and teal sky. */
 export const PALETTE = {
   skyTop: '#4a2a9c', skyMid: '#2c1a70', skyBottom: '#0f4060',
   nebulaViolet: '170, 110, 255', nebulaMagenta: '245, 110, 225', nebulaTeal: '60, 220, 240',
@@ -25,9 +22,11 @@ export const PALETTE = {
 };
 
 export const WEAVER = { speed: 330, radius: 11, reach: 270, hearts: 3, maxHearts: 6, invulnerable: 1.6, trailLength: 14 };
-export const STARS = { count: 15, margin: 70, spacing: 135, hitRadius: 34, topMargin: 76, attractTopMargin: 240 };
+export const STARS = { count: 15, margin: 70, spacing: 135, hitRadius: 34, topMargin: 76 };
+/** On the title the attract scene keeps its stars and moths to this band of the field, between the word mark and the prompt. */
+export const ATTRACT = { top: 228, bottom: 446, stars: 12 };
 export const LOOM = {
-  minLoop: 3, flash: 0.7, afterglow: 3.5, attractAfterglow: 16, cutSeconds: 0.8, steadyCutSeconds: 1.8,
+  minLoop: 3, flash: 0.7, afterglow: 3.5, attractAfterglow: 12, cutSeconds: 0.8, steadyCutSeconds: 1.8,
   burnSeconds: 0.55, cutterBurnSeconds: 1.6, wideNet: 40, lodestar: 80, stunRadius: 90,
 };
 export const MOTHS = {
@@ -48,5 +47,4 @@ export const SCORING = {
 };
 export const SLOW_TIME = { factor: 0.28, duration: 3, cooldown: 12 };
 export const SPAWN = { interval: 0.85, firstDelay: 1.2, edgeInset: 30 };
-/** After this boss wave the cards offered are relics. */
 export const RELIC_WAVE = 5;

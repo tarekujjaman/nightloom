@@ -1,12 +1,12 @@
 // The anchor stars a thread can be woven between, and the parallax backdrop stars.
 import { FIELD, STARS } from './config.js';
 
-/** `count` anchor stars inside the margins, none closer than STARS.spacing to another. */
-export function placeAnchorStars(random, count = STARS.count, topMargin = STARS.topMargin) {
+/** `count` anchor stars inside the margins and between `top` and `bottom`, none closer than STARS.spacing to another. */
+export function placeAnchorStars(random, count = STARS.count, top = STARS.topMargin, bottom = FIELD.height - STARS.margin) {
   const stars = [];
   for (let attempts = 0; stars.length < count && attempts < 4000; attempts += 1) {
     const x = random.range(STARS.margin, FIELD.width - STARS.margin);
-    const y = random.range(topMargin, FIELD.height - STARS.margin);
+    const y = random.range(top, bottom);
     const spacing = attempts > 2000 ? STARS.spacing * 0.7 : STARS.spacing;
     if (stars.every((star) => Math.hypot(star.x - x, star.y - y) >= spacing)) {
       stars.push({ x, y, size: random.range(5, 8), phase: random.angle(), twinkle: random.range(1.2, 2.4) });
@@ -15,7 +15,6 @@ export function placeAnchorStars(random, count = STARS.count, topMargin = STARS.
   return stars;
 }
 
-/** Three parallax depths of small backdrop stars. */
 export function makeBackdropStars(random) {
   return [
     { depth: 0.015, count: 150, size: [0.7, 1.4], alpha: 0.5 },
@@ -31,21 +30,19 @@ export function makeBackdropStars(random) {
   }));
 }
 
-/** The index of the anchor star under (x, y) within STARS.hitRadius, or -1. */
 export function starAt(stars, x, y, radius = STARS.hitRadius) {
   let best = -1;
   let bestDistance = radius;
-  for (let i = 0; i < stars.length; i += 1) {
-    const distance = Math.hypot(stars[i].x - x, stars[i].y - y);
+  stars.forEach((star, i) => {
+    const distance = Math.hypot(star.x - x, star.y - y);
     if (distance < bestDistance) {
       bestDistance = distance;
       best = i;
     }
-  }
+  });
   return best;
 }
 
-/** True when the star is within `reach` of the point. */
 export function starInReach(star, x, y, reach) {
   return Math.hypot(star.x - x, star.y - y) <= reach;
 }

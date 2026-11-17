@@ -1,5 +1,5 @@
 // The rules of NIGHTLOOM in fixed steps: weaving, captures, moths, hearts, waves, cards and the end of the night.
-import { FIELD, LOOM, MOTHS, SCORING, SLOW_TIME, SPAWN, STARS } from './config.js';
+import { ATTRACT, FIELD, LOOM, MOTHS, SCORING, SLOW_TIME, SPAWN } from './config.js';
 import { createRandom } from './random.js';
 import { makeBackdropStars, placeAnchorStars, starAt, starInReach } from './stars.js';
 import { createWeaver, hurtWeaver, stepWeaver, weaverVulnerable } from './weaver.js';
@@ -13,7 +13,8 @@ import { scoreLoop, tierName, waveBonus } from './scoring.js';
 
 export const PHASE = { PLAY: 'play', CLEAR: 'clear', UPGRADE: 'upgrade', WON: 'won', LOST: 'lost' };
 
-export const EVENT = { ANCHOR: 1, EXTEND: 2, SNAP: 4, CAPTURE: 8, HIT: 16, CUT: 32, WAVE: 64, CLEAR: 128, WON: 256, LOST: 512, SLOW: 1024, RELEASE: 2048, BURN: 4096, VEIL: 8192, UPGRADE: 16384, PHASE: 32768 };
+/** The bits `stepWorld` returns, for sounds and announcements. */
+export const EVENT = { ANCHOR: 1, EXTEND: 2, SNAP: 4, CAPTURE: 8, HIT: 16, CUT: 32, WAVE: 64, CLEAR: 128, WON: 256, LOST: 512, SLOW: 1024, RELEASE: 2048, BURN: 4096, VEIL: 8192, PHASE: 16384 };
 
 const CLEAR_SECONDS = 2;
 const WON_SECONDS = 2.6;
@@ -23,18 +24,16 @@ const GOLD = ['#ffd36b', '#fff2c4', '#74f3ff', '#ffffff'];
 const EMBER = ['#ff3b2a', '#ff8a45', '#ffd36b'];
 const VOID = ['#b48cff', '#74f3ff', '#ffffff'];
 const SPARKS = {
-  star: { count: 4, colors: GOLD, speed: 60, life: 0.8, size: 2 }, anchor: { count: 8, colors: GOLD, speed: 90, life: 0.5, size: 2 },
-  extend: { count: 6, colors: GOLD, speed: 80, life: 0.45, size: 2 }, catch: { count: 20, colors: GOLD, speed: 230, life: 0.8, size: 3 },
-  catchEmber: { count: 6, colors: EMBER, speed: 120, life: 0.5, size: 2.5 }, bossFall: { count: 90, colors: GOLD, speed: 420, life: 1.4, size: 4, drag: 1.6 },
-  bossEmber: { count: 40, colors: EMBER, speed: 200, life: 1, size: 3 }, veil: { count: 40, colors: VOID, speed: 300, life: 1, size: 3.5 },
+  star: { count: 6, colors: GOLD, speed: 80, life: 0.5, size: 2 }, catch: { count: 26, colors: [...GOLD, ...EMBER], speed: 230, life: 0.8, size: 3 },
+  bossFall: { count: 130, colors: [...GOLD, ...EMBER], speed: 420, life: 1.4, size: 4, drag: 1.6 }, veil: { count: 40, colors: VOID, speed: 300, life: 1, size: 3.5 },
   stun: { count: 6, colors: VOID, speed: 90, life: 0.6, size: 2 }, smoulder: { count: 1, colors: EMBER, speed: 90, life: 0.5, size: 2.5, gravity: -120 },
   burn: { count: 22, colors: EMBER, speed: 200, life: 0.8, size: 3, gravity: -80 }, hit: { count: 30, colors: EMBER, speed: 260, life: 0.8, size: 3 },
-  fall: { count: 120, colors: ['#ffffff', '#ffd36b', '#ff3b2a', '#74f3ff'], speed: 380, life: 1.6, size: 4, drag: 1.4 },
+  fall: { count: 120, colors: ['#ffffff', ...GOLD, '#ff3b2a'], speed: 380, life: 1.6, size: 4, drag: 1.4 },
   cut: { count: 18, colors: ['#ff3b2a', '#ffffff', '#74f3ff'], speed: 180, life: 0.6, size: 2.5 }, cheer: { count: 36, colors: GOLD, speed: 260, life: 1.2, size: 3.2, drag: 1.8 },
 };
 const sparks = (state, x, y, kind) => burst(state.effects, state.random, x, y, SPARKS[kind]);
 
-/** A new night from `seed`; in attract mode the Weaver cannot be hurt and waves cycle for the title. */
+/** A new night from `seed`; in attract mode nothing hurts and the waves cycle for the title. */
 export function createWorld(seed, attract = false) {
   const random = createRandom(seed);
   return {
@@ -51,7 +50,7 @@ export function createWorld(seed, attract = false) {
 export function startWave(state, wave) {
   const definition = waveDefinition(wave);
   state.wave = wave;
-  state.stars = placeAnchorStars(state.random, STARS.count, state.attract ? STARS.attractTopMargin : STARS.topMargin);
+  state.stars = state.attract ? placeAnchorStars(state.random, ATTRACT.stars, ATTRACT.top + 12, ATTRACT.bottom - 16) : placeAnchorStars(state.random);
   state.spawnQueue = waveSpawnList(wave, state.random);
   state.waveTotal = state.spawnQueue.length;
   state.spawnTimer = SPAWN.firstDelay;
@@ -66,11 +65,10 @@ export function startWave(state, wave) {
   return EVENT.WAVE;
 }
 
-/** Pick the offered card `id` and move on to the next wave. */
 export function chooseUpgrade(state, id) {
   if (state.phase !== PHASE.UPGRADE || !state.offer.includes(id)) return 0;
   applyUpgrade(state, id);
-  return startWave(state, state.wave + 1) | EVENT.UPGRADE;
+  return startWave(state, state.wave + 1);
 }
 
 function spawnNext(state) {
@@ -81,7 +79,7 @@ function spawnNext(state) {
     state.moths.push(spawnBoss(kind, boss.veils, state.random, scale));
     return;
   }
-  const point = edgeSpawnPoint(state.random);
+  const point = edgeSpawnPoint(state.random, state.attract);
   state.moths.push(spawnMoth(kind, point.x, point.y, state.random, scale));
 }
 
@@ -103,7 +101,7 @@ function stepWeaving(state, control) {
   if (!loom.active) {
     if (state.pressConsumed || !reachable) return 0;
     anchorThread(loom, hover);
-    sparks(state, star.x, star.y, 'anchor');
+    sparks(state, star.x, star.y, 'star');
     return EVENT.ANCHOR;
   }
   if (canCloseLoop(loom, hover)) {
@@ -112,10 +110,11 @@ function stepWeaving(state, control) {
   }
   if (!canExtendTo(loom, hover) || !reachable) return 0;
   extendThread(loom, hover);
-  sparks(state, star.x, star.y, 'extend');
+  sparks(state, star.x, star.y, 'star');
   return EVENT.EXTEND;
 }
 
+/** A loop closed round the boss: one veil falls, or the boss itself; a new phase raises its banner. */
 function stripBoss(state, moth, worths) {
   const before = bossPhase(moth);
   if (stripVeil(moth)) {
@@ -124,7 +123,6 @@ function stripBoss(state, moth, worths) {
     state.stats.captured += 1;
     state.stats.waveCaptured += 1;
     sparks(state, moth.x, moth.y, 'bossFall');
-    sparks(state, moth.x, moth.y, 'bossEmber');
     addShake(state.effects, 16);
     return 0;
   }
@@ -156,7 +154,6 @@ function captureLoop(state) {
       state.stats.captured += 1;
       state.stats.waveCaptured += 1;
       sparks(state, moth.x, moth.y, 'catch');
-      sparks(state, moth.x, moth.y, 'catchEmber');
     }
   }
   const chain = state.time - state.combo.lastCapture <= SCORING.comboWindow ? state.combo.chain + 1 : 1;
@@ -304,14 +301,15 @@ export function stepWorld(state, control, dt) {
   }
   for (const moth of state.moths) {
     if (!moth.alive) continue;
-    const outcome = moth.boss ? stepBoss(moth, state, mothDt) : stepMoth(moth, state, mothDt);
-    if (outcome !== 'cut' || !state.loom.cut) continue;
-    const cut = state.loom.cut;
-    sparks(state, cut.x, cut.y, 'cut');
-    floatText(state.effects, cut.x, cut.y - 16, 'THREAD CUT!', { color: '#ff3b2a', size: 24, life: 0.9 });
-    severThread(state.loom, state.stars, cut.segment);
-    addShake(state.effects, 5);
-    events |= EVENT.CUT;
+    if (moth.boss) stepBoss(moth, state, mothDt);
+    else if (stepMoth(moth, state, mothDt) && state.loom.cut) {
+      const cut = state.loom.cut;
+      sparks(state, cut.x, cut.y, 'cut');
+      floatText(state.effects, cut.x, cut.y - 16, 'THREAD CUT!', { color: '#ff3b2a', size: 24, life: 0.9 });
+      severThread(state.loom, state.stars, cut.segment);
+      addShake(state.effects, 5);
+      events |= EVENT.CUT;
+    }
   }
   if (state.loom.cut && !state.moths.some((moth) => moth.alive && moth.kind === 'cutter' && moth.state === 'chew')) state.loom.cut = null;
   state.moths.push(...state.pending);
@@ -342,7 +340,6 @@ export function stepWorld(state, control, dt) {
   return events;
 }
 
-/** True when the end screen should take over from the field. */
 export function worldFinished(state) {
   return (state.phase === PHASE.WON && state.phaseTime >= WON_SECONDS) || (state.phase === PHASE.LOST && state.phaseTime >= LOST_SECONDS);
 }

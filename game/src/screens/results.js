@@ -1,16 +1,15 @@
-// The results: score, run grade, the run's stats, the high score, threads held and the restart prompt.
-import { PALETTE, VIEW } from '../config.js';
+// The results (score, run grade, the run's stats, the high score, threads held and the restart prompt) and the pause veil.
+import { ARENA, PALETTE, VIEW } from '../config.js';
 import { FONT_TITLE, glowText, roundRect } from '../glow.js';
 import { formatScore, runGrade } from '../scoring.js';
 import { RARITY_COLORS, heldCards } from '../upgrades.js';
 import { WAVE_COUNT } from '../waves.js';
 import { PHASE } from '../world.js';
-import { GRADE_COLORS } from '../hud/bottombar.js';
-import { pill, tag, tagCentred, tagWidth } from '../hud/widgets.js';
+import { CONTROLS, GRADE_COLORS } from '../hud/bars.js';
+import { keyStrip, pill, tag, tagCentred, tagWidth } from '../hud/widgets.js';
 
-/** Draw the results in view coordinates. */
 export function drawResults(ctx, state, ui) {
-  ctx.fillStyle = 'rgba(6, 2, 18, 0.8)';
+  ctx.fillStyle = 'rgba(6, 2, 18, 0.86)';
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   const won = state.phase === PHASE.WON;
   const color = won ? PALETTE.gold : PALETTE.ember;
@@ -78,4 +77,15 @@ export function drawResults(ctx, state, ui) {
 
   glowText(ctx, 'PRESS R  /  CLICK TO PLAY AGAIN', cx, y + 530, { size: 30, color: PALETTE.goldLight, glow: PALETTE.gold, blur: 22, letterSpacing: 5, alpha: 0.7 + 0.3 * Math.sin(ui.time * 3.2) });
   glowText(ctx, 'ESC  back to the title   ·   M  sound', cx, y + 570, { size: 13, color: PALETTE.textSoft, letterSpacing: 2 });
+}
+
+export function drawPause(ctx, ui) {
+  ctx.fillStyle = 'rgba(6, 2, 18, 0.66)';
+  ctx.fillRect(ARENA.x, ARENA.y, ARENA.width, ARENA.height);
+  const cx = ARENA.x + ARENA.width / 2;
+  const cy = ARENA.y + ARENA.height / 2;
+  glowText(ctx, 'PAUSED', cx, cy - 90, { font: FONT_TITLE, size: 76, weight: '700', color: PALETTE.gold, glow: PALETTE.cyan, blur: 30, letterSpacing: 12 });
+  glowText(ctx, 'P or ESC to resume', cx, cy - 22, { size: 22, color: PALETTE.text, letterSpacing: 2, alpha: 0.75 + 0.25 * Math.sin(ui.time * 3) });
+  keyStrip(ctx, CONTROLS.slice(0, 4), cx - 330, cy + 40, 15);
+  keyStrip(ctx, CONTROLS.slice(4), cx - 330, cy + 80, 15);
 }

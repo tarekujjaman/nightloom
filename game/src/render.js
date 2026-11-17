@@ -2,18 +2,17 @@
 import { ARENA, FIELD, LOOM, PALETTE, VIEW } from './config.js';
 import { drawSprite, glowText, makeGlowSprite, rgba, sparklePath } from './glow.js';
 import { drawBackdropStars, drawNebula, drawSky, drawVignette } from './sky.js';
-import { drawMoth, drawMothLabel } from './mothart.js';
+import { drawMoth } from './mothart.js';
+import { drawFieldLabels } from './labels.js';
 import { starInReach } from './stars.js';
 import { PHASE } from './world.js';
-import { drawTopBar } from './hud/topbar.js';
+import { findBoss } from './bosses.js';
+import { drawBottomBar, drawTopBar } from './hud/bars.js';
 import { drawSidePanel } from './hud/sidepanel.js';
-import { drawBottomBar } from './hud/bottombar.js';
-import { drawBossBar } from './hud/bossbar.js';
-import { drawCallout, drawWaveBanner } from './hud/callouts.js';
-import { drawTitle } from './screens/title.js';
+import { calloutAnchor, drawBossBar, drawCallout, drawObjective, drawWaveBanner } from './hud/callouts.js';
+import { TITLE_ZONES, drawTitle } from './screens/title.js';
 import { drawUpgradeChoice } from './screens/upgrade.js';
-import { drawResults } from './screens/results.js';
-import { drawPause } from './screens/pause.js';
+import { drawPause, drawResults } from './screens/results.js';
 
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -252,7 +251,6 @@ export function createRenderer(canvas) {
       ctx.arc(weaver.x, weaver.y, 28, 0, Math.PI * 2);
       ctx.stroke();
     }
-    glowText(ctx, 'YOU', weaver.x, weaver.y - 30, { size: 11, color: PALETTE.goldLight, outline: PALETTE.ink, letterSpacing: 2 });
     ctx.restore();
   }
 
@@ -287,12 +285,26 @@ export function createRenderer(canvas) {
     edge.addColorStop(1, `rgba(60, 200, 230, ${0.28 * Math.min(1, slow.active * 2)})`);
     ctx.fillStyle = edge;
     ctx.fillRect(0, 0, FIELD.width, FIELD.height);
-    glowText(ctx, 'STILL TIME', FIELD.width / 2, FIELD.height - 40, { size: 26, color: PALETTE.cyan, glow: PALETTE.cyanDeep, blur: 20, letterSpacing: 8, alpha: 0.6 + 0.4 * Math.sin(state.time * 6), outline: PALETTE.ink });
+    glowText(ctx, 'STILL TIME', FIELD.width / 2, FIELD.height - 76, { size: 26, color: PALETTE.cyan, glow: PALETTE.cyanDeep, blur: 20, letterSpacing: 8, alpha: 0.6 + 0.4 * Math.sin(state.time * 6), outline: PALETTE.ink });
   }
 
-  function drawField(state) {
+  /** What the field labels keep clear of: the title's words, or the objective line, boss bar, banner, callout and CLOSE HERE. */
+  function overlayBoxes(state, title) {
+    if (title) return TITLE_ZONES;
+    const { loom, stars, callout } = state;
+    const boxes = [{ x: FIELD.width / 2 - 400, y: FIELD.height - 50, w: 800, h: 50 }];
+    if (findBoss(state.moths)) boxes.push({ x: FIELD.width / 2 - 300, y: 0, w: 600, h: 92 });
+    if (state.banner) boxes.push({ x: 0, y: 106, w: FIELD.width, h: 134 });
+    if (callout) {
+      const { x, y } = calloutAnchor(state);
+      boxes.push({ x: x - 250, y: y - 80, w: 500, h: 126 });
+    }
+    if (loom.active && loom.chain.length >= LOOM.minLoop) boxes.push({ x: stars[loom.chain[0]].x - 50, y: stars[loom.chain[0]].y - 50, w: 100, h: 24 });
+    return boxes;
+  }
+
+  function drawField(state, title) {
     const { weaver, effects } = state;
-    const alive = state.moths.filter((moth) => moth.alive);
     ctx.save();
     ctx.translate(effects.shakeX, effects.shakeY);
     drawSky(ctx);
@@ -302,11 +314,10 @@ export function createRenderer(canvas) {
     if (state.phase !== PHASE.LOST) drawReach(state);
     drawAnchorStars(state);
     drawThreads(state);
-    for (const moth of alive) drawMoth(ctx, moth, state.time);
+    for (const moth of state.moths) if (moth.alive) drawMoth(ctx, moth, state.time);
     drawFlashes(state);
     if (state.phase !== PHASE.LOST) drawWeaver(state);
-    const explained = new Set();
-    for (const moth of alive) drawMothLabel(ctx, moth, explained);
+    drawFieldLabels(ctx, state, overlayBoxes(state, title), title);
     drawParticles(state);
     ctx.restore();
     drawVignette(ctx);
@@ -330,15 +341,16 @@ export function createRenderer(canvas) {
       ctx.beginPath();
       ctx.rect(0, 0, FIELD.width, FIELD.height);
       ctx.clip();
-      drawField(state);
+      const title = screen === SCREEN_TITLE;
+      drawField(state, title);
       if (screen === SCREEN_PLAY || screen === SCREEN_PAUSED) {
         drawBossBar(ctx, state);
+        drawObjective(ctx, state);
         drawCallout(ctx, state);
         drawWaveBanner(ctx, state);
       }
-      if (screen === SCREEN_TITLE) drawTitle(ctx, state, ui);
+      if (title) drawTitle(ctx, state, ui);
       ctx.restore();
-      const title = screen === SCREEN_TITLE;
       drawTopBar(ctx, state, ui, title);
       drawSidePanel(ctx, state, ui, title);
       drawBottomBar(ctx, state, ui, title);

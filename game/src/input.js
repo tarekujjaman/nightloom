@@ -9,7 +9,7 @@ const KEY_ACTIONS = {
   Digit1: ACTION.PICK_1, Numpad1: ACTION.PICK_1, Digit2: ACTION.PICK_2, Numpad2: ACTION.PICK_2, Digit3: ACTION.PICK_3, Numpad3: ACTION.PICK_3,
 };
 
-/** Listen on the window and the canvas. */
+/** Listen on the window and the canvas; `toLogical` maps client points into the 1280x800 view. */
 export function createInput(canvas, toLogical) {
   const held = new Set();
   const control = { moveX: 0, moveY: 0, cursorX: ARENA.width / 2, cursorY: ARENA.height / 2, viewX: 0, viewY: 0, pressed: false, slowPressed: false };
@@ -23,8 +23,15 @@ export function createInput(canvas, toLogical) {
     call();
   }
 
+  function trackPointer(event) {
+    const point = toLogical(event.clientX, event.clientY);
+    control.viewX = point.x;
+    control.viewY = point.y;
+    control.cursorX = point.x - ARENA.x;
+    control.cursorY = point.y - ARENA.y;
+  }
+
   window.addEventListener('keydown', (event) => {
-    if (event.target && (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA')) return;
     gesture();
     if (MOVE_KEYS[event.code] || event.code === 'Space') event.preventDefault();
     if (event.repeat) return;
@@ -36,14 +43,6 @@ export function createInput(canvas, toLogical) {
     held.clear();
     control.pressed = false;
   });
-
-  function trackPointer(event) {
-    const point = toLogical(event.clientX, event.clientY);
-    control.viewX = point.x;
-    control.viewY = point.y;
-    control.cursorX = point.x - ARENA.x;
-    control.cursorY = point.y - ARENA.y;
-  }
   window.addEventListener('pointermove', trackPointer);
   canvas.addEventListener('pointerdown', (event) => {
     gesture();
@@ -64,7 +63,6 @@ export function createInput(canvas, toLogical) {
   canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
   return {
-    /** The movement vector and cursor for this frame; movement is normalised so diagonals are no faster. */
     control() {
       let x = 0;
       let y = 0;
@@ -80,7 +78,6 @@ export function createInput(canvas, toLogical) {
       control.moveY = length > 0 ? y / length : 0;
       return control;
     },
-    /** The one-shot actions since the last call, then cleared. */
     takeActions() {
       const taken = actions;
       actions = 0;
