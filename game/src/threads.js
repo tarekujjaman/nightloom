@@ -1,20 +1,9 @@
-// The loom: the chain of threads the player is weaving star to star, the loop it closes into, the
-// flash and afterglow a closed loop leaves, and the geometry that decides what a loop encloses.
+// The loom: the chain being woven, the loop it closes into, its flash and afterglow, and what a loop encloses.
 import { LOOM } from './config.js';
 
 /** An empty loom: no chain held, nothing glowing. */
 export function createLoom() {
-  return {
-    chain: [],
-    active: false,
-    cursorX: 0,
-    cursorY: 0,
-    flashes: [],
-    afterglows: [],
-    ghosts: [],
-    cut: null,
-    plucked: 0,
-  };
+  return { chain: [], active: false, cursorX: 0, cursorY: 0, flashes: [], afterglows: [], ghosts: [], cut: null, plucked: 0 };
 }
 
 /** Start a chain at `starIndex`. */
@@ -41,7 +30,7 @@ export function canExtendTo(loom, starIndex) {
   return loom.active && !loom.chain.includes(starIndex);
 }
 
-/** Close the chain into a loop: returns its polygon and clears the chain. */
+/** Close the chain into a loop: it flashes, then glows for `afterglowSeconds`; the chain is cleared. */
 export function closeLoop(loom, stars, afterglowSeconds, tier = 1) {
   const polygon = loom.chain.map((index) => ({ x: stars[index].x, y: stars[index].y }));
   loom.flashes.push({ polygon, age: 0, tier });
@@ -49,14 +38,11 @@ export function closeLoop(loom, stars, afterglowSeconds, tier = 1) {
   loom.chain = [];
   loom.active = false;
   loom.cut = null;
-  return polygon;
 }
 
 /** Drop the chain; its threads linger as fading ghosts for a moment. */
 export function releaseThread(loom, stars) {
-  if (loom.chain.length >= 2) {
-    loom.ghosts.push({ points: loom.chain.map((index) => ({ x: stars[index].x, y: stars[index].y })), age: 0 });
-  }
+  if (loom.chain.length >= 2) loom.ghosts.push({ points: loom.chain.map((index) => ({ x: stars[index].x, y: stars[index].y })), age: 0 });
   loom.chain = [];
   loom.active = false;
   loom.cut = null;
@@ -65,9 +51,7 @@ export function releaseThread(loom, stars) {
 /** A cutter has severed segment `segmentIndex`: the chain keeps the stars up to it; the rest falls away. */
 export function severThread(loom, stars, segmentIndex) {
   const lost = loom.chain.slice(segmentIndex);
-  if (lost.length >= 2) {
-    loom.ghosts.push({ points: lost.map((index) => ({ x: stars[index].x, y: stars[index].y })), age: 0, cut: true });
-  }
+  if (lost.length >= 2) loom.ghosts.push({ points: lost.map((index) => ({ x: stars[index].x, y: stars[index].y })), age: 0, cut: true });
   loom.chain = loom.chain.slice(0, segmentIndex + 1);
   loom.cut = null;
   if (loom.chain.length === 0) loom.active = false;
@@ -94,7 +78,7 @@ export function stepLoom(loom, dt) {
   loom.ghosts = loom.ghosts.filter((ghost) => ghost.age < 0.6);
 }
 
-/** Signed shoelace area, returned positive. */
+/** Shoelace area, returned positive. */
 export function polygonArea(points) {
   let sum = 0;
   for (let i = 0; i < points.length; i += 1) {
@@ -151,6 +135,5 @@ export function distanceToPolygonEdge(x, y, points) {
 
 /** True when (x, y) is inside the polygon or within `margin` of its edge. */
 export function polygonCaptures(x, y, points, margin = 0) {
-  if (pointInPolygon(x, y, points)) return true;
-  return margin > 0 && distanceToPolygonEdge(x, y, points) <= margin;
+  return pointInPolygon(x, y, points) || (margin > 0 && distanceToPolygonEdge(x, y, points) <= margin);
 }

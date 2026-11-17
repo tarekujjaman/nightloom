@@ -25,10 +25,6 @@ export function createRandom(seed) {
     chance(p) {
       return random.next() < p;
     },
-    /** One element of a non-empty array. */
-    pick(list) {
-      return list[Math.floor(random.next() * list.length)];
-    },
     /** A unit-ish angle in [0, 2π). */
     angle() {
       return random.next() * Math.PI * 2;

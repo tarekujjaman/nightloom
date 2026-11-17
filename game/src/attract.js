@@ -1,6 +1,4 @@
-// The autopilot that weaves on the title screen (and stages the screenshots): it picks a cluster
-// of stars that encloses the most moths, flies the Weaver to its middle, then sweeps the cursor
-// star to star and back to the first, so the real rules close the loop and capture the moths.
+// The autopilot that weaves on the title and stages screenshots: pick a star cluster, fly there, sweep the cursor round it.
 import { FIELD } from './config.js';
 import { pointInPolygon, polygonArea, polygonCentroid } from './threads.js';
 
@@ -10,37 +8,21 @@ const WEAVE_TIMEOUT = 7;
 /** A fresh pilot, about to choose its first loop. */
 export function createAttractPilot() {
   return {
-    phase: 'choose',
-    cluster: [],
-    index: 0,
-    timer: 0.6,
-    elapsed: 0,
-    recent: [],
-    loopsAtStart: 0,
-    targetX: FIELD.width / 2,
-    targetY: FIELD.height / 2,
+    phase: 'choose', cluster: [], index: 0, timer: 0.6, elapsed: 0, recent: [], loopsAtStart: 0, targetX: FIELD.width / 2, targetY: FIELD.height / 2,
     control: { moveX: 0, moveY: 0, cursorX: FIELD.width / 2, cursorY: FIELD.height / 2, pressed: false, slowPressed: false },
   };
 }
 
-/** Order star indices by angle around their centroid so the loop does not cross itself. */
 function orderByAngle(stars, indices) {
   const centre = polygonCentroid(indices.map((i) => stars[i]));
   return indices.slice().sort((a, b) => Math.atan2(stars[a].y - centre.y, stars[a].x - centre.x) - Math.atan2(stars[b].y - centre.y, stars[b].x - centre.x));
 }
 
-/** How many stars two clusters share. */
 function overlap(a, b) {
-  let shared = 0;
-  for (const star of a) if (b.includes(star)) shared += 1;
-  return shared;
+  return a.filter((star) => b.includes(star)).length;
 }
 
-/**
- * The cluster of 4 to 6 stars, all within the Weaver's reach of their middle, whose loop would
- * enclose the most moths (then the largest); clusters sharing most of their stars with one in
- * `recent` are skipped, so the pilot wanders the whole sky.
- */
+/** The cluster of 4 to 6 stars, all within the Weaver's reach of their middle, whose loop would enclose the most moths (then the largest); clusters sharing. */
 export function chooseCluster(state, recent = []) {
   const { stars, moths, weaver } = state;
   let best = null;
@@ -52,16 +34,9 @@ export function chooseCluster(state, recent = []) {
       if (recent.some((cluster) => overlap(cluster, ordered) * 2 > Math.min(cluster.length, ordered.length))) continue;
       const polygon = ordered.map((i) => stars[i]);
       const centre = polygonCentroid(polygon);
-      let fits = true;
-      for (const p of polygon) {
-        if (Math.hypot(p.x - centre.x, p.y - centre.y) > weaver.reach - 24) {
-          fits = false;
-          break;
-        }
-      }
-      if (!fits) continue;
+      if (polygon.some((p) => Math.hypot(p.x - centre.x, p.y - centre.y) > weaver.reach - 24)) continue;
       let count = 0;
-      for (const moth of moths) if (moth.alive && moth.kind !== 'eclipse' && pointInPolygon(moth.x, moth.y, polygon)) count += 1;
+      for (const moth of moths) if (moth.alive && !moth.boss && pointInPolygon(moth.x, moth.y, polygon)) count += 1;
       const score = count * 100000 + polygonArea(polygon) / 100;
       if (!best || score > best.score) best = { score, cluster: ordered, centre, count };
     }

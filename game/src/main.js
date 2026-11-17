@@ -1,40 +1,27 @@
-// Boot and the one loop. Input is read every frame, the world advances in fixed 1/60 s steps, and
-// the renderer paints what is there. The game moves between five screens: the title (with the
-// autopilot weaving behind it), play, paused, the upgrade choice between waves, and the results.
-//
-// ?seed=N fixes the night. ?shot=title|play|upgrade|victory|defeat (with &seed=N) stages that
-// scene instead of running the loop, paints it twice and sets window.__shotReady for a screenshot.
+// Boot and the one loop: input each frame, fixed 1/60 s world steps, then a paint. ?seed=N fixes
+// the night; ?shot=play|title|upgrade|results (with &seed=N) stages that scene for a screenshot.
 import { STEP } from './config.js';
-import {
-  EVENT_ANCHOR, EVENT_BURN, EVENT_CAPTURE, EVENT_CLEAR, EVENT_CUT, EVENT_EXTEND, EVENT_HIT, EVENT_LOST, EVENT_RELEASE,
-  EVENT_SLOW, EVENT_SNAP, EVENT_VEIL, EVENT_WAVE, EVENT_WON, PHASE_UPGRADE, chooseUpgrade, createWorld, startWave,
-  stepWorld, worldFinished,
-} from './world.js';
-import {
-  ACTION_CLICK, ACTION_CONFIRM, ACTION_MUTE, ACTION_PAUSE, ACTION_PICK_1, ACTION_PICK_2, ACTION_PICK_3, ACTION_RESTART,
-  ACTION_SLOW, createInput,
-} from './input.js';
+import { EVENT, PHASE, chooseUpgrade, createWorld, startWave, stepWorld, worldFinished } from './world.js';
+import { ACTION, createInput } from './input.js';
 import { createAudio } from './audio.js';
-import { createRenderer } from './render.js';
-import { SCREEN_PAUSED, SCREEN_PLAY, SCREEN_RESULTS, SCREEN_TITLE, SCREEN_UPGRADE, upgradeCardAt } from './screens.js';
+import { SCREEN_PAUSED, SCREEN_PLAY, SCREEN_RESULTS, SCREEN_TITLE, SCREEN_UPGRADE, createRenderer } from './render.js';
+import { upgradeCardAt } from './screens/upgrade.js';
 import { createAttractPilot, pilotControl } from './attract.js';
 import { readHighScore, saveHighScore } from './storage.js';
+import { runGrade } from './scoring.js';
 import { isBossWave } from './waves.js';
 import { stageShot } from './shots.js';
 
-/** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
 const MAX_FRAME = 0.25;
 
 const params = new URLSearchParams(window.location.search);
 const shot = params.get('shot');
 const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
 const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
-
 const canvas = document.getElementById('game');
 const status = document.getElementById('status');
 const renderer = createRenderer(canvas);
 
-/** Stage one scene, paint it twice and flag it ready. */
 function runShot(name) {
   const scene = stageShot(name, seed);
   let painted = 0;
@@ -47,17 +34,15 @@ function runShot(name) {
   requestAnimationFrame(paint);
 }
 
-/** The playable game. */
 function runGame() {
   const audio = createAudio();
   const input = createInput(canvas, renderer.toLogical);
   input.onFirstGesture(() => audio.unlock());
 
   let gameSeed = seed;
-  let world = createWorld((seed ^ 0x9e3779b9) >>> 0, true);
-  startWave(world, 3);
-  let pilot = createAttractPilot();
-  let screen = SCREEN_TITLE;
+  let world;
+  let pilot;
+  let screen;
   let best = readHighScore();
   let isNewBest = false;
   let hover = -1;
@@ -65,7 +50,7 @@ function runGame() {
   let last = performance.now();
   let wall = 0;
 
-  // Screen readers (and anyone watching the page's text) hear the screen changes and each hit.
+  // The status line screen readers hear.
   function announce(message) {
     status.textContent = message;
   }
@@ -91,49 +76,68 @@ function runGame() {
   }
 
   function finishGame() {
-    if (world.score > best) {
-      best = world.score;
-      saveHighScore(best);
-      isNewBest = true;
-    }
+    if (world.score <= best) return;
+    best = world.score;
+    saveHighScore(best);
+    isNewBest = true;
   }
 
   function playEvents(events) {
-    if (events & EVENT_ANCHOR) audio.playAnchor(0);
-    if (events & EVENT_EXTEND) audio.playAnchor(world.loom.plucked - 1);
-    if (events & EVENT_SNAP) audio.playSnap();
-    if (events & EVENT_CAPTURE && world.lastCapture) audio.playCapture(world.lastCapture.count, world.lastCapture.tier);
-    if (events & EVENT_VEIL) audio.playVeil();
-    if (events & EVENT_BURN) audio.playBurn();
-    if (events & EVENT_RELEASE) audio.playRelease();
-    if (events & EVENT_CUT) audio.playCut();
-    if (events & EVENT_SLOW) audio.playSlow();
-    if (events & EVENT_HIT) {
+    if (events & EVENT.ANCHOR) audio.playAnchor(0);
+    if (events & EVENT.EXTEND) audio.playAnchor(world.loom.plucked - 1);
+    if (events & EVENT.SNAP) audio.playSnap();
+    if (events & EVENT.CAPTURE && world.callout) audio.playCapture(world.callout.count, world.callout.multiplier);
+    if (events & EVENT.VEIL) audio.playVeil();
+    if (events & EVENT.PHASE) {
+      audio.playFanfare(true);
+      announce(`${world.banner.name}: ${world.banner.title}.`);
+    }
+    if (events & EVENT.BURN) audio.playBurn();
+    if (events & EVENT.RELEASE) audio.playRelease();
+    if (events & EVENT.CUT) audio.playCut();
+    if (events & EVENT.SLOW) audio.playSlow();
+    if (events & EVENT.HIT) {
       audio.playHit();
       announce(world.weaver.hearts === 1 ? 'Hit. 1 heart left.' : `Hit. ${world.weaver.hearts} hearts left.`);
     }
-    if (events & EVENT_CLEAR) {
+    if (events & EVENT.CLEAR) {
       audio.playClear();
-      announce(`Wave ${world.wave} cleared. Score ${world.score}.`);
+      announce(`Wave ${world.wave} cleared. Score ${world.score}. Grade ${runGrade(world).letter}.`);
     }
-    if (events & EVENT_WAVE && world.wave > 1) audio.playFanfare(isBossWave(world.wave));
-    if (events & EVENT_WON) {
+    if (events & EVENT.WAVE && world.wave > 1) audio.playFanfare(isBossWave(world.wave));
+    if (events & EVENT.WON) {
       finishGame();
       audio.playVictory();
       announce(`Victory. The night is woven. Score ${world.score}. Best ${best}.`);
     }
-    if (events & EVENT_LOST) {
+    if (events & EVENT.LOST) {
       finishGame();
       audio.playDefeat();
       announce(`Defeat on wave ${world.wave}. Score ${world.score}. Best ${best}.`);
     }
   }
 
-  function stepPlay(control, slowPressed) {
-    control.slowPressed = slowPressed;
-    const events = stepWorld(world, control, STEP);
-    control.slowPressed = false;
-    playEvents(events);
+  function advance(control, slow = false) {
+    while (accumulator >= STEP && screen === SCREEN_PLAY) {
+      control.slowPressed = slow;
+      playEvents(stepWorld(world, control, STEP));
+      control.slowPressed = false;
+      slow = false;
+      accumulator -= STEP;
+      if (world.phase === PHASE.UPGRADE) {
+        screen = SCREEN_UPGRADE;
+        hover = -1;
+        announce(`Wave ${world.wave} cleared. Choose a card: 1, 2 or 3.`);
+      } else if (worldFinished(world)) screen = SCREEN_RESULTS;
+    }
+  }
+
+  /** The world keeps breathing behind a screen that takes no play input. */
+  function idle(control) {
+    while (accumulator >= STEP) {
+      stepWorld(world, control, STEP);
+      accumulator -= STEP;
+    }
   }
 
   function frame(now) {
@@ -144,86 +148,38 @@ function runGame() {
     accumulator += dt;
     const actions = input.takeActions();
     const control = input.control();
-    if (actions & ACTION_MUTE) {
-      const muted = audio.toggleMute();
-      announce(muted ? 'Muted.' : 'Sound on.');
-    }
-    switch (screen) {
-      case SCREEN_TITLE:
-        if (actions & (ACTION_CLICK | ACTION_CONFIRM)) {
-          newGame();
-        } else {
-          while (accumulator >= STEP) {
-            stepWorld(world, pilotControl(pilot, world, STEP), STEP);
-            accumulator -= STEP;
-          }
-        }
-        break;
-      case SCREEN_PLAY:
-        if (actions & ACTION_PAUSE) {
-          screen = SCREEN_PAUSED;
-          announce('Paused.');
-          break;
-        }
-        {
-          let slow = Boolean(actions & ACTION_SLOW);
-          while (accumulator >= STEP && screen === SCREEN_PLAY) {
-            stepPlay(control, slow);
-            slow = false;
-            accumulator -= STEP;
-            if (world.phase === PHASE_UPGRADE) {
-              screen = SCREEN_UPGRADE;
-              hover = -1;
-              announce(`Wave ${world.wave} cleared. Choose an upgrade: 1, 2 or 3.`);
-            } else if (worldFinished(world)) {
-              screen = SCREEN_RESULTS;
-            }
-          }
-        }
-        break;
-      case SCREEN_PAUSED:
-        accumulator = 0;
-        if (actions & (ACTION_PAUSE | ACTION_CONFIRM)) {
-          screen = SCREEN_PLAY;
-          announce('Playing.');
-        }
-        break;
-      case SCREEN_UPGRADE: {
-        hover = upgradeCardAt(control.cursorX, control.cursorY, world.offer.length);
-        let pick = -1;
-        if (actions & ACTION_PICK_1) pick = 0;
-        else if (actions & ACTION_PICK_2) pick = 1;
-        else if (actions & ACTION_PICK_3) pick = 2;
-        else if (actions & ACTION_CLICK && hover >= 0) pick = hover;
-        if (pick >= 0 && pick < world.offer.length) {
-          audio.playSelect();
-          playEvents(chooseUpgrade(world, world.offer[pick]));
-          world.pressConsumed = true;
-          screen = SCREEN_PLAY;
-          accumulator = 0;
-        } else {
-          while (accumulator >= STEP) {
-            stepWorld(world, control, STEP);
-            accumulator -= STEP;
-          }
-        }
-        break;
+    if (actions & ACTION.MUTE) announce(audio.toggleMute() ? 'Muted.' : 'Sound on.');
+    if (screen === SCREEN_TITLE) {
+      if (actions & (ACTION.CLICK | ACTION.CONFIRM)) newGame();
+      else idle(pilotControl(pilot, world, STEP));
+    } else if (screen === SCREEN_PLAY) {
+      if (actions & ACTION.PAUSE) {
+        screen = SCREEN_PAUSED;
+        announce('Paused.');
+      } else advance(control, Boolean(actions & ACTION.SLOW));
+    } else if (screen === SCREEN_PAUSED) {
+      accumulator = 0;
+      if (actions & (ACTION.PAUSE | ACTION.CONFIRM)) {
+        screen = SCREEN_PLAY;
+        announce('Playing.');
       }
-      default:
-        if (actions & (ACTION_RESTART | ACTION_CLICK | ACTION_CONFIRM)) newGame();
-        else if (actions & ACTION_PAUSE) backToTitle();
-        else {
-          while (accumulator >= STEP) {
-            stepWorld(world, control, STEP);
-            accumulator -= STEP;
-          }
-        }
-        break;
-    }
+    } else if (screen === SCREEN_UPGRADE) {
+      hover = upgradeCardAt(control.viewX, control.viewY, world.offer.length);
+      const pick = actions & ACTION.PICK_1 ? 0 : actions & ACTION.PICK_2 ? 1 : actions & ACTION.PICK_3 ? 2 : actions & ACTION.CLICK ? hover : -1;
+      if (pick >= 0 && pick < world.offer.length) {
+        audio.playSelect();
+        playEvents(chooseUpgrade(world, world.offer[pick]));
+        world.pressConsumed = true;
+        screen = SCREEN_PLAY;
+        accumulator = 0;
+      } else idle(control);
+    } else if (actions & (ACTION.RESTART | ACTION.CLICK | ACTION.CONFIRM)) newGame();
+    else if (actions & ACTION.PAUSE) backToTitle();
+    else idle(control);
     renderer.draw(world, screen, { best, hover, muted: audio.muted, isNewBest, time: wall });
   }
 
-  // Leaving the tab pauses a running game rather than letting moths fly unseen.
+  // A hidden tab pauses the game.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && screen === SCREEN_PLAY) {
       screen = SCREEN_PAUSED;
@@ -231,17 +187,11 @@ function runGame() {
     }
   });
 
-  announce('NIGHTLOOM. Click to begin.');
+  backToTitle();
   requestAnimationFrame(frame);
 
-  // ?debug exposes the live state for the automated play-through in tools/check.mjs.
-  if (params.has('debug')) {
-    window.__nightloom = {
-      world: () => world,
-      screen: () => screen,
-      best: () => best,
-    };
-  }
+  // ?debug exposes the state to tools/check.mjs.
+  if (params.has('debug')) window.__nightloom = { world: () => world, screen: () => screen, best: () => best, grade: () => runGrade(world) };
 }
 
 if (shot) runShot(shot);

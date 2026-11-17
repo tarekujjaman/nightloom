@@ -1,6 +1,7 @@
 // Play NIGHTLOOM through in headless Chrome and report any console error or uncaught exception:
-// the title, a click to start, keyboard movement, a loop woven with the mouse, pause, mute, every
-// wave cleared to the victory screen, a restart, a defeat and another restart.
+// the title, a click to start, keyboard movement, a loop woven with the mouse, pause, mute, still
+// time, the HUD's threat queue and grade, the boss and its phases, the relic choice, every wave
+// cleared to the victory screen, a restart, a defeat and another restart.
 //   node tools/check.mjs
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +19,7 @@ function expect(condition, message) {
 }
 
 async function key(session, sessionId, code, keyName, holdMs = 0) {
-  const base = { code, key: keyName, windowsVirtualKeyCode: keyName.length === 1 ? keyName.toUpperCase().charCodeAt(0) : 0 };
+  const base = { code, key: keyName, windowsVirtualKeyCode: keyName.length === 1 ? keyName.toUpperCase().charCodeAt(0) : keyName === ' ' ? 32 : 0 };
   await session.send('Input.dispatchKeyEvent', { type: 'keyDown', ...base }, sessionId);
   if (holdMs > 0) await sleep(holdMs);
   await session.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base }, sessionId);
@@ -57,10 +58,14 @@ async function main() {
     await waitFor(session, sessionId, 'Boolean(window.__nightloom)', 20000);
     await sleep(1500);
     const read = (expression) => evaluate(session, sessionId, `(() => { const g = window.__nightloom; const w = g.world(); return ${expression}; })()`);
+    const call = (body) => evaluate(session, sessionId, `(async () => { const g = window.__nightloom; const w = g.world(); ${body} })()`);
+    // The playfield sits inside the HUD frame: mouse events need the arena's offset added to field points.
+    const arena = await evaluate(session, sessionId, "import('./src/config.js').then((m) => m.ARENA)");
+    const inView = (p) => ({ x: p.x + arena.x, y: p.y + arena.y });
 
     console.log('title');
     expect((await read('g.screen()')) === 'title', 'the title screen shows first');
-    expect((await read('w.loom.afterglows.length + w.loom.flashes.length + w.stats.loops')) >= 0, 'the attract scene runs');
+    expect((await read('w.attract && w.stars.length')) > 0, 'the attract scene runs behind the title');
 
     console.log('start');
     await mouse(session, sessionId, 'mouseMoved', 640, 400);
@@ -81,23 +86,22 @@ async function main() {
 
     console.log('weaving');
     await sleep(2500);
-    const plan = await evaluate(session, sessionId, `(async () => {
+    const plan = await call(`
       const { chooseCluster } = await import('./src/attract.js');
-      const w = window.__nightloom.world();
       const choice = chooseCluster(w);
       w.weaver.x = choice.centre.x; w.weaver.y = choice.centre.y;
-      return { stars: choice.cluster.map((i) => ({ x: w.stars[i].x, y: w.stars[i].y })), count: choice.count };
-    })()`);
+      return { stars: choice.cluster.map((i) => ({ x: w.stars[i].x, y: w.stars[i].y })), count: choice.count };`);
     const loopsBefore = await read('w.stats.loops');
-    const first = plan.stars[0];
+    const first = inView(plan.stars[0]);
     await mouse(session, sessionId, 'mouseMoved', first.x, first.y);
     await mouse(session, sessionId, 'mousePressed', first.x, first.y);
     await sleep(80);
     expect((await read('w.loom.active && w.loom.chain.length')) === 1, 'pressing on a star in reach anchors a thread');
     let from = first;
     for (const star of plan.stars.slice(1)) {
-      await glide(session, sessionId, from, star);
-      from = star;
+      const to = inView(star);
+      await glide(session, sessionId, from, to);
+      from = to;
     }
     expect((await read('w.loom.chain.length')) === plan.stars.length, `dragging star to star chains ${plan.stars.length} stars`);
     await glide(session, sessionId, from, first);
@@ -107,8 +111,17 @@ async function main() {
     await mouse(session, sessionId, 'mouseReleased', first.x, first.y);
     const score = await read('w.score');
     console.log(`  loop enclosed ${plan.count} moth(s); score ${score}`);
+    if (plan.count > 0) expect((await read('w.callout && w.callout.points')) > 0, 'a catch raises the LOOP CLOSED callout');
 
-    console.log('pause and mute');
+    console.log('hud');
+    const rows = await call("const { threatRows } = await import('./src/hud/sidepanel.js'); return threatRows(w);");
+    const left = await call("const { mothsLeft } = await import('./src/hud/topbar.js'); return mothsLeft(w);");
+    expect(rows.length > 0 && rows.every((row) => row.kind && row.count > 0), `the threat queue lists ${rows.map((row) => `${row.kind} ×${row.count}`).join(', ')}`);
+    expect(rows.reduce((sum, row) => sum + row.count, 0) === left, `its counts add up to the ${left} moths left in the wave banner`);
+    const grade = await read('g.grade()');
+    expect('SABCD'.includes(grade.letter) && grade.progress >= 0 && grade.progress <= 1, `the run grade reads ${grade.letter}`);
+
+    console.log('pause, mute and still time');
     await key(session, sessionId, 'KeyP', 'p');
     await sleep(100);
     expect((await read('g.screen()')) === 'paused', 'P pauses');
@@ -119,25 +132,45 @@ async function main() {
     await sleep(100);
     expect((await evaluate(session, sessionId, "document.getElementById('status').textContent")) === 'Muted.', 'M mutes');
     await key(session, sessionId, 'KeyM', 'm');
+    await call('w.slow.owned = true; w.slow.charge = 1; return true;');
+    await key(session, sessionId, 'Space', ' ');
+    await sleep(120);
+    expect((await read('w.slow.active')) > 0, 'Space fires still time once it is held and charged');
 
     console.log('waves to victory');
+    let relicPicked = null;
     for (let wave = 1; wave <= 10; wave += 1) {
-      await evaluate(session, sessionId, '(() => { const w = window.__nightloom.world(); w.spawnQueue = []; w.pending = []; for (const m of w.moths) m.alive = false; w.weaver.invulnerable = 99; return true; })()');
-      const wasBoss = await read('w.moths.some((m) => m.kind === "eclipse")');
+      if (wave === 5 || wave === 10) {
+        await waitFor(session, sessionId, 'window.__nightloom.world().moths.some((m) => m.boss)', 8000);
+        const boss = await call("const { bossPhase } = await import('./src/bosses.js'); const b = w.moths.find((m) => m.boss); return { kind: b.kind, veils: b.veils, phase: bossPhase(b) };");
+        expect(boss.veils === (wave === 5 ? 3 : 5) && boss.phase === 0, `wave ${wave}: the ${boss.kind} descends with ${boss.veils} veils in phase 1`);
+        const phases = await call("const { bossPhase, stripVeil } = await import('./src/bosses.js'); const b = w.moths.find((m) => m.boss); const seen = []; while (b.veils > 1) { stripVeil(b); seen.push(bossPhase(b)); } return seen;");
+        expect(phases[phases.length - 1] === 2, `stripping veils drives it through phases ${[...new Set(phases)].map((p) => p + 1).join(' and ')}`);
+        const bossRow = await call("const { threatRows } = await import('./src/hud/sidepanel.js'); return threatRows(w).find((row) => row.boss);");
+        expect(bossRow && bossRow.boss.veils === 1, 'the threat queue shows the boss with its last veil');
+      }
+      if (wave === 6) expect(await read("w.spawnQueue.includes('phantom')"), 'wave 6 sends phantoms');
+      if (wave === 7) expect(await read("w.spawnQueue.includes('warden')"), 'wave 7 sends a Hex Warden');
+      await call('w.spawnQueue = []; w.pending = []; for (const m of w.moths) m.alive = false; w.weaver.invulnerable = 99; return true;');
       await waitFor(session, sessionId, "['upgrade', 'results'].includes(window.__nightloom.screen())", 15000);
       const screen = await read('g.screen()');
-      if (wave < 10) {
-        expect(screen === 'upgrade', `wave ${wave} cleared opens the upgrade choice${wasBoss ? ' (boss wave)' : ''}`);
-        const offer = await read('w.offer.slice()');
-        expect(offer.length === 3, `three cards are offered (${offer.join(', ')})`);
-        const pick = (wave % 3) + 1;
-        await key(session, sessionId, `Digit${pick}`, String(pick));
-        await sleep(150);
-        expect((await read('g.screen()')) === 'play' && (await read('w.wave')) === wave + 1, `card ${pick} picked, wave ${wave + 1} begins`);
-        await sleep(1300);
-      } else {
+      if (wave === 10) {
         expect(screen === 'results' && (await read('w.phase')) === 'won', 'clearing wave 10 shows the victory results');
+        break;
       }
+      expect(screen === 'upgrade', `wave ${wave} cleared opens the card choice`);
+      const offer = await read('w.offer.slice()');
+      const relics = await call("const { RELICS } = await import('./src/upgrades.js'); return w.offer.every((id) => RELICS.some((r) => r.id === id));");
+      expect(offer.length === 3, `three cards are offered (${offer.join(', ')})`);
+      if (wave === 5) expect(relics, 'after the Eclipse Moth the three cards are relics');
+      else expect(!relics, 'they are thread upgrades');
+      const pick = (wave % 3) + 1;
+      if (wave === 5) relicPicked = offer[pick - 1];
+      await key(session, sessionId, `Digit${pick}`, String(pick));
+      await sleep(150);
+      expect((await read('g.screen()')) === 'play' && (await read('w.wave')) === wave + 1, `card ${pick} picked, wave ${wave + 1} begins`);
+      if (wave === 5) expect((await read(`w.upgrades['${relicPicked}']`)) === 1, `the relic ${relicPicked} is held and listed under THREADS HELD`);
+      await sleep(1300);
     }
     const finalScore = await read('w.score');
     expect((await read('g.best()')) === finalScore, `the high score is saved (${finalScore})`);
@@ -149,13 +182,11 @@ async function main() {
     expect((await read('g.screen()')) === 'play' && (await read('w.wave')) === 1 && (await read('w.score')) === 0, 'R restarts on wave 1 with score 0');
 
     console.log('defeat');
-    await evaluate(session, sessionId, `(async () => {
+    await call(`
       const { spawnMoth } = await import('./src/enemies.js');
-      const w = window.__nightloom.world();
       w.weaver.hearts = 1; w.weaver.invulnerable = 0; w.weaver.shield = 0;
       w.moths.push(spawnMoth('drifter', w.weaver.x, w.weaver.y, w.random, 1));
-      return true;
-    })()`);
+      return true;`);
     await waitFor(session, sessionId, "window.__nightloom.screen() === 'results'", 10000);
     expect((await read('w.phase')) === 'lost' && (await read('w.weaver.hearts')) === 0, 'losing the last heart shows the defeat results');
     await mouse(session, sessionId, 'mousePressed', 640, 400);

@@ -1,26 +1,35 @@
-// The renderer: fits the 1280x800 field into the window and paints the world each frame, back to
-// front: sky, nebula, parallax stars, loop afterglows, anchor stars, the held threads, moths, the
-// Weaver, sparks, the snap flash and labels; then the HUD and whichever screen is on top.
-import { FIELD, LOOM, PALETTE } from './config.js';
+// The renderer: fits the view to the window, paints the playfield back to front, then the HUD frame and the screen on top.
+import { ARENA, FIELD, LOOM, PALETTE, VIEW } from './config.js';
 import { drawSprite, glowText, makeGlowSprite, rgba, sparklePath } from './glow.js';
 import { drawBackdropStars, drawNebula, drawSky, drawVignette } from './sky.js';
-import { drawMoth } from './mothart.js';
+import { drawMoth, drawMothLabel } from './mothart.js';
 import { starInReach } from './stars.js';
-import { drawHud } from './hud.js';
-import { SCREEN_PAUSED, SCREEN_RESULTS, SCREEN_TITLE, SCREEN_UPGRADE, drawPause, drawResults, drawTitle, drawUpgradeChoice, drawWaveBanner } from './screens.js';
-import { PHASE_LOST } from './world.js';
+import { PHASE } from './world.js';
+import { drawTopBar } from './hud/topbar.js';
+import { drawSidePanel } from './hud/sidepanel.js';
+import { drawBottomBar } from './hud/bottombar.js';
+import { drawBossBar } from './hud/bossbar.js';
+import { drawCallout, drawWaveBanner } from './hud/callouts.js';
+import { drawTitle } from './screens/title.js';
+import { drawUpgradeChoice } from './screens/upgrade.js';
+import { drawResults } from './screens/results.js';
+import { drawPause } from './screens/pause.js';
 
-/** The renderer bound to `canvas`; `draw` paints a frame and `toLogical` maps client points to the field. */
+export const SCREEN_TITLE = 'title';
+export const SCREEN_PLAY = 'play';
+export const SCREEN_PAUSED = 'paused';
+export const SCREEN_UPGRADE = 'upgrade';
+export const SCREEN_RESULTS = 'results';
+
+const TIER_COLORS = [PALETTE.cyan, PALETTE.cyan, PALETTE.gold, PALETTE.magenta, PALETTE.gold, PALETTE.gold];
+
+/** The renderer bound to `canvas`; `draw` paints a frame and `toLogical` maps client points to the view. */
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
-  const view = { dpr: 1, scale: 1, offsetX: 0, offsetY: 0, width: FIELD.width, height: FIELD.height };
+  const view = { dpr: 1, scale: 1, offsetX: 0, offsetY: 0, width: VIEW.width, height: VIEW.height };
   const sprites = {
-    star: makeGlowSprite(PALETTE.gold, 30, 0.1),
-    starCyan: makeGlowSprite(PALETTE.cyan, 36, 0.06),
-    weaver: makeGlowSprite(PALETTE.gold, 64, 0.06),
-    weaverCore: makeGlowSprite('#ffffff', 18, 0.3),
-    spark: makeGlowSprite(PALETTE.cyan, 12, 0.3),
-    cut: makeGlowSprite(PALETTE.ember, 40, 0.1),
+    star: makeGlowSprite(PALETTE.gold, 30, 0.1), starCyan: makeGlowSprite(PALETTE.cyan, 36, 0.06), weaver: makeGlowSprite(PALETTE.gold, 64, 0.06),
+    weaverCore: makeGlowSprite('#ffffff', 18, 0.3), spark: makeGlowSprite(PALETTE.cyan, 12, 0.3), cut: makeGlowSprite(PALETTE.ember, 40, 0.1),
   };
 
   function resize() {
@@ -31,9 +40,9 @@ export function createRenderer(canvas) {
     view.height = height;
     canvas.width = Math.round(width * view.dpr);
     canvas.height = Math.round(height * view.dpr);
-    view.scale = Math.min(width / FIELD.width, height / FIELD.height);
-    view.offsetX = (width - FIELD.width * view.scale) / 2;
-    view.offsetY = (height - FIELD.height * view.scale) / 2;
+    view.scale = Math.min(width / VIEW.width, height / VIEW.height);
+    view.offsetX = (width - VIEW.width * view.scale) / 2;
+    view.offsetY = (height - VIEW.height * view.scale) / 2;
   }
   window.addEventListener('resize', resize);
   resize();
@@ -42,39 +51,61 @@ export function createRenderer(canvas) {
     return { x: (clientX - view.offsetX) / view.scale, y: (clientY - view.offsetY) / view.scale };
   }
 
+  function tracePath(points, close = true) {
+    ctx.beginPath();
+    for (const p of points) ctx.lineTo(p.x, p.y);
+    if (close) ctx.closePath();
+  }
+
+  function glowStroke(color, width, blur, alpha) {
+    ctx.strokeStyle = rgba(color, alpha);
+    ctx.lineWidth = width;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = blur;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function fillNet(polygon, color, alpha, time) {
+    ctx.save();
+    tracePath(polygon);
+    ctx.clip();
+    ctx.fillStyle = rgba(color, 0.13 * alpha);
+    ctx.fillRect(0, 0, FIELD.width, FIELD.height);
+    ctx.strokeStyle = rgba(color, 0.24 * alpha);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    const shift = (time * 10) % 24;
+    for (let d = -FIELD.height; d < FIELD.width + FIELD.height; d += 24) {
+      ctx.moveTo(d + shift, 0);
+      ctx.lineTo(d + shift - FIELD.height, FIELD.height);
+      ctx.moveTo(d - shift, 0);
+      ctx.lineTo(d - shift + FIELD.height, FIELD.height);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function drawAfterglows(state) {
     const { loom } = state;
-    if (loom.afterglows.length === 0 && loom.ghosts.length === 0) return;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.lineJoin = 'round';
     for (const glow of loom.afterglows) {
-      const fade = 1 - glow.age / glow.life;
-      const alpha = Math.min(1, fade * 1.4);
-      ctx.beginPath();
-      glow.polygon.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-      ctx.closePath();
-      ctx.fillStyle = rgba(PALETTE.cyan, 0.07 * alpha);
-      ctx.fill();
-      ctx.strokeStyle = rgba(PALETTE.cyan, 0.7 * alpha);
-      ctx.lineWidth = 4.5;
-      ctx.shadowColor = PALETTE.cyan;
-      ctx.shadowBlur = 18;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = rgba(PALETTE.goldLight, 0.7 * alpha);
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      for (const p of glow.polygon) {
-        drawSprite(ctx, sprites.star, p.x, p.y, 0.9, 0.6 * alpha);
-      }
+      const alpha = Math.min(1, (1 - glow.age / glow.life) * 1.4);
+      const color = TIER_COLORS[glow.tier] || PALETTE.cyan;
+      fillNet(glow.polygon, color, alpha, state.time);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineJoin = 'round';
+      tracePath(glow.polygon);
+      glowStroke(color, 6, 18, 0.75 * alpha);
+      glowStroke(PALETTE.goldLight, 2, 0, 0.8 * alpha);
+      for (const p of glow.polygon) drawSprite(ctx, sprites.star, p.x, p.y, 0.9, 0.6 * alpha);
+      ctx.restore();
     }
+    ctx.save();
+    ctx.lineWidth = 2;
     for (const ghost of loom.ghosts) {
-      const alpha = (1 - ghost.age / 0.6) * 0.5;
-      ctx.strokeStyle = ghost.cut ? rgba(PALETTE.ember, alpha) : rgba(PALETTE.textDim, alpha);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ghost.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      tracePath(ghost.points, false);
+      ctx.strokeStyle = rgba(ghost.cut ? PALETTE.ember : PALETTE.textSoft, (1 - ghost.age / 0.6) * 0.55);
       ctx.stroke();
     }
     ctx.restore();
@@ -82,16 +113,14 @@ export function createRenderer(canvas) {
 
   function drawReach(state) {
     const { weaver, loom } = state;
-    if (state.phase === PHASE_LOST) return;
-    ctx.save();
-    ctx.strokeStyle = rgba(PALETTE.cyan, loom.active ? 0.32 : 0.14);
+    ctx.strokeStyle = rgba(PALETTE.cyan, loom.active ? 0.4 : 0.2);
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 11]);
     ctx.lineDashOffset = -state.time * 24;
     ctx.beginPath();
     ctx.arc(weaver.x, weaver.y, weaver.reach, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.restore();
+    ctx.setLineDash([]);
   }
 
   function drawAnchorStars(state) {
@@ -101,9 +130,8 @@ export function createRenderer(canvas) {
       const star = stars[i];
       const twinkle = 0.8 + 0.2 * Math.sin(state.time * star.twinkle + star.phase);
       const inChain = loom.chain.includes(i);
-      const reachable = state.phase !== PHASE_LOST && starInReach(star, weaver.x, weaver.y, weaver.reach);
+      const reachable = state.phase !== PHASE.LOST && starInReach(star, weaver.x, weaver.y, weaver.reach);
       const hovered = i === state.hoverStar;
-      const first = loom.active && loom.chain[0] === i;
       ctx.globalCompositeOperation = 'lighter';
       drawSprite(ctx, sprites.star, star.x, star.y, (star.size / 7) * (inChain ? 1.9 : reachable ? 1.35 : 0.95) * twinkle, inChain ? 1 : reachable ? 0.85 : 0.5);
       if (reachable) drawSprite(ctx, sprites.starCyan, star.x, star.y, 0.9, inChain ? 0.6 : 0.3);
@@ -115,13 +143,13 @@ export function createRenderer(canvas) {
       sparklePath(ctx, star.x, star.y, star.size * 0.8 * twinkle, 0.3, Math.PI / 4);
       ctx.fill();
       if (reachable || inChain) {
-        ctx.strokeStyle = rgba(PALETTE.cyan, hovered ? 0.95 : inChain ? 0.75 : 0.4);
+        ctx.strokeStyle = rgba(PALETTE.cyan, hovered ? 0.95 : inChain ? 0.75 : 0.45);
         ctx.lineWidth = hovered ? 2.5 : 1.5;
         ctx.beginPath();
         ctx.arc(star.x, star.y, hovered ? 20 : 15, 0, Math.PI * 2);
         ctx.stroke();
       }
-      if (first && loom.chain.length >= LOOM.minLoop) {
+      if (loom.active && loom.chain[0] === i && loom.chain.length >= LOOM.minLoop) {
         const pulse = 0.5 + 0.5 * Math.sin(state.time * 8);
         ctx.strokeStyle = rgba(PALETTE.gold, 0.5 + 0.5 * pulse);
         ctx.lineWidth = 2.5;
@@ -130,6 +158,7 @@ export function createRenderer(canvas) {
         ctx.arc(star.x, star.y, 26 + pulse * 5, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+        glowText(ctx, 'CLOSE HERE', star.x, star.y - 38, { size: 12, color: PALETTE.gold, outline: PALETTE.ink, letterSpacing: 1 });
       }
     }
     ctx.restore();
@@ -144,30 +173,20 @@ export function createRenderer(canvas) {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     if (points.length >= 2) {
-      ctx.beginPath();
-      points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-      ctx.strokeStyle = rgba(PALETTE.cyan, 0.5);
-      ctx.lineWidth = 8;
-      ctx.shadowColor = PALETTE.cyan;
-      ctx.shadowBlur = 22;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = rgba(PALETTE.goldLight, 0.95);
-      ctx.lineWidth = 2.4;
-      ctx.stroke();
+      tracePath(points, false);
+      glowStroke(PALETTE.cyan, 12, 24, 0.55);
+      glowStroke(PALETTE.goldLight, 3.5, 0, 1);
       for (let i = 0; i + 1 < points.length; i += 1) {
-        const a = points[i];
-        const b = points[i + 1];
         for (let k = 0; k < 2; k += 1) {
           const t = (state.time * 0.55 + k * 0.5 + i * 0.21) % 1;
-          drawSprite(ctx, sprites.spark, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, 1.1, 0.8);
+          drawSprite(ctx, sprites.spark, points[i].x + (points[i + 1].x - points[i].x) * t, points[i].y + (points[i + 1].y - points[i].y) * t, 1.1, 0.8);
         }
       }
     }
     if (loom.active) {
       const last = points[points.length - 1];
-      ctx.strokeStyle = rgba(PALETTE.cyan, 0.55);
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = rgba(PALETTE.cyan, 0.6);
+      ctx.lineWidth = 2.5;
       ctx.setLineDash([8, 7]);
       ctx.lineDashOffset = -state.time * 60;
       ctx.beginPath();
@@ -190,48 +209,30 @@ export function createRenderer(canvas) {
   }
 
   function drawFlashes(state) {
-    const { loom } = state;
-    if (loom.flashes.length === 0) return;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineJoin = 'round';
-    for (const flash of loom.flashes) {
-      const fade = 1 - flash.age / LOOM.flash;
-      const alpha = Math.pow(fade, 1.5);
-      ctx.beginPath();
-      flash.polygon.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-      ctx.closePath();
-      ctx.fillStyle = rgba(PALETTE.goldDeep, 0.3 * alpha);
+    for (const flash of state.loom.flashes) {
+      const alpha = Math.pow(1 - flash.age / LOOM.flash, 1.5);
+      tracePath(flash.polygon);
+      ctx.fillStyle = rgba(PALETTE.goldDeep, 0.2 * alpha);
       ctx.fill();
-      ctx.strokeStyle = rgba(PALETTE.cyan, 0.85 * alpha);
-      ctx.lineWidth = 9;
-      ctx.shadowColor = PALETTE.cyan;
-      ctx.shadowBlur = 30;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = rgba('#ffffff', alpha);
-      ctx.lineWidth = 2.5 + 2 * alpha;
-      ctx.shadowColor = PALETTE.goldLight;
-      ctx.shadowBlur = 18;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      glowStroke(PALETTE.cyan, 10, 30, 0.8 * alpha);
+      glowStroke('#ffffff', 2.5 + 2 * alpha, 18, alpha);
     }
     ctx.restore();
   }
 
   function drawWeaver(state) {
     const { weaver } = state;
-    if (state.phase === PHASE_LOST) return;
-    const blink = weaver.invulnerable > 0 && Math.floor(state.time * 14) % 2 === 0;
-    const alpha = blink ? 0.3 : 1;
+    const alpha = weaver.invulnerable > 0 && Math.floor(state.time * 14) % 2 === 0 ? 0.3 : 1;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < weaver.trail.length; i += 1) {
+    weaver.trail.forEach((p, i) => {
       const t = (i + 1) / weaver.trail.length;
-      drawSprite(ctx, sprites.spark, weaver.trail[i].x, weaver.trail[i].y, 0.5 + t * 0.9, t * 0.45 * alpha);
-    }
-    const pulse = 0.9 + 0.1 * Math.sin(weaver.pulse * 6);
-    drawSprite(ctx, sprites.weaver, weaver.x, weaver.y, pulse, 0.9 * alpha);
+      drawSprite(ctx, sprites.spark, p.x, p.y, 0.5 + t * 0.9, t * 0.45 * alpha);
+    });
+    drawSprite(ctx, sprites.weaver, weaver.x, weaver.y, 0.9 + 0.1 * Math.sin(weaver.pulse * 6), 0.9 * alpha);
     drawSprite(ctx, sprites.weaverCore, weaver.x, weaver.y, 1.1, alpha);
     ctx.restore();
     ctx.save();
@@ -242,9 +243,6 @@ export function createRenderer(canvas) {
     ctx.fillStyle = '#ffffff';
     sparklePath(ctx, weaver.x, weaver.y, 11, 0.3, -state.time * 1.3);
     ctx.fill();
-    ctx.beginPath();
-    ctx.arc(weaver.x, weaver.y, 5.5, 0, Math.PI * 2);
-    ctx.fill();
     if (weaver.shield > 0) {
       ctx.strokeStyle = rgba(PALETTE.cyan, Math.min(1, weaver.shield) * 0.9);
       ctx.lineWidth = 2.5;
@@ -254,15 +252,14 @@ export function createRenderer(canvas) {
       ctx.arc(weaver.x, weaver.y, 28, 0, Math.PI * 2);
       ctx.stroke();
     }
+    glowText(ctx, 'YOU', weaver.x, weaver.y - 30, { size: 11, color: PALETTE.goldLight, outline: PALETTE.ink, letterSpacing: 2 });
     ctx.restore();
   }
 
   function drawParticles(state) {
-    const { particles } = state.effects;
-    if (particles.length === 0) return;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    for (const p of particles) {
+    for (const p of state.effects.particles) {
       const life = 1 - p.age / p.life;
       ctx.globalAlpha = life;
       ctx.fillStyle = p.color;
@@ -271,61 +268,48 @@ export function createRenderer(canvas) {
       ctx.fill();
     }
     ctx.restore();
-  }
-
-  function drawTexts(state) {
     for (const label of state.effects.texts) {
       const t = label.age / label.life;
-      const alpha = 1 - t * t;
-      glowText(ctx, label.text, label.x, label.y - label.rise * t, { size: label.size, weight: '800', color: label.color, glow: label.color, blur: 16, alpha });
+      glowText(ctx, label.text, label.x, label.y - label.rise * t, { size: label.size, color: label.color, glow: label.color, blur: 16, alpha: 1 - t * t, outline: PALETTE.ink });
     }
   }
 
   function drawOverlays(state) {
     const { effects, slow } = state;
-    if (effects.redFlash > 0) {
-      ctx.fillStyle = `rgba(255, 40, 30, ${effects.redFlash * 0.3})`;
+    for (const [amount, color] of [[effects.redFlash * 0.3, '255, 40, 30'], [effects.goldFlash * 0.14, '255, 210, 110'], [effects.cyanFlash * 0.22, '116, 243, 255']]) {
+      if (amount <= 0) continue;
+      ctx.fillStyle = `rgba(${color}, ${amount})`;
       ctx.fillRect(0, 0, FIELD.width, FIELD.height);
     }
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    if (effects.goldFlash > 0) {
-      ctx.fillStyle = `rgba(255, 210, 110, ${effects.goldFlash * 0.14})`;
-      ctx.fillRect(0, 0, FIELD.width, FIELD.height);
-    }
-    if (effects.cyanFlash > 0) {
-      ctx.fillStyle = `rgba(116, 243, 255, ${effects.cyanFlash * 0.22})`;
-      ctx.fillRect(0, 0, FIELD.width, FIELD.height);
-    }
-    ctx.restore();
-    if (slow.active > 0) {
-      const edge = ctx.createRadialGradient(FIELD.width / 2, FIELD.height / 2, FIELD.height * 0.3, FIELD.width / 2, FIELD.height / 2, FIELD.width * 0.7);
-      edge.addColorStop(0, 'rgba(60, 200, 230, 0)');
-      edge.addColorStop(1, `rgba(60, 200, 230, ${0.28 * Math.min(1, slow.active * 2)})`);
-      ctx.fillStyle = edge;
-      ctx.fillRect(0, 0, FIELD.width, FIELD.height);
-    }
+    if (slow.active <= 0) return;
+    const edge = ctx.createRadialGradient(FIELD.width / 2, FIELD.height / 2, FIELD.height * 0.3, FIELD.width / 2, FIELD.height / 2, FIELD.width * 0.7);
+    edge.addColorStop(0, 'rgba(60, 200, 230, 0)');
+    edge.addColorStop(1, `rgba(60, 200, 230, ${0.28 * Math.min(1, slow.active * 2)})`);
+    ctx.fillStyle = edge;
+    ctx.fillRect(0, 0, FIELD.width, FIELD.height);
+    glowText(ctx, 'STILL TIME', FIELD.width / 2, FIELD.height - 40, { size: 26, color: PALETTE.cyan, glow: PALETTE.cyanDeep, blur: 20, letterSpacing: 8, alpha: 0.6 + 0.4 * Math.sin(state.time * 6), outline: PALETTE.ink });
   }
 
-  /** The whole field, from sky to labels. */
   function drawField(state) {
     const { weaver, effects } = state;
+    const alive = state.moths.filter((moth) => moth.alive);
     ctx.save();
     ctx.translate(effects.shakeX, effects.shakeY);
     drawSky(ctx);
     drawNebula(ctx, state.time);
     drawBackdropStars(ctx, state.backdrop, weaver.x - FIELD.width / 2, weaver.y - FIELD.height / 2, state.time);
     drawAfterglows(state);
-    drawReach(state);
+    if (state.phase !== PHASE.LOST) drawReach(state);
     drawAnchorStars(state);
     drawThreads(state);
-    for (const moth of state.moths) if (moth.alive) drawMoth(ctx, moth, state.time);
+    for (const moth of alive) drawMoth(ctx, moth, state.time);
     drawFlashes(state);
-    drawWeaver(state);
+    if (state.phase !== PHASE.LOST) drawWeaver(state);
+    const explained = new Set();
+    for (const moth of alive) drawMothLabel(ctx, moth, explained);
     drawParticles(state);
-    drawTexts(state);
     ctx.restore();
-    drawVignette(ctx, 0.5);
+    drawVignette(ctx);
     drawOverlays(state);
   }
 
@@ -334,25 +318,33 @@ export function createRenderer(canvas) {
     /** Paint `state` with `screen` on top; `ui` carries the high score, hover card, mute state and wall time. */
     draw(state, screen, ui) {
       ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-      ctx.fillStyle = PALETTE.skyBottom;
+      ctx.fillStyle = '#07031a';
       ctx.fillRect(0, 0, view.width, view.height);
       ctx.save();
       ctx.setTransform(view.dpr * view.scale, 0, 0, view.dpr * view.scale, view.dpr * view.offsetX, view.dpr * view.offsetY);
       ctx.beginPath();
+      ctx.rect(0, 0, VIEW.width, VIEW.height);
+      ctx.clip();
+      ctx.save();
+      ctx.translate(ARENA.x, ARENA.y);
+      ctx.beginPath();
       ctx.rect(0, 0, FIELD.width, FIELD.height);
       ctx.clip();
       drawField(state);
-      if (screen === SCREEN_TITLE) {
-        drawTitle(ctx, state, ui);
-      } else {
-        if (screen !== SCREEN_RESULTS) {
-          drawHud(ctx, state, ui, { wave: screen !== SCREEN_UPGRADE });
-          if (screen !== SCREEN_UPGRADE) drawWaveBanner(ctx, state);
-        }
-        if (screen === SCREEN_PAUSED) drawPause(ctx, ui);
-        if (screen === SCREEN_UPGRADE) drawUpgradeChoice(ctx, state, ui);
-        if (screen === SCREEN_RESULTS) drawResults(ctx, state, ui);
+      if (screen === SCREEN_PLAY || screen === SCREEN_PAUSED) {
+        drawBossBar(ctx, state);
+        drawCallout(ctx, state);
+        drawWaveBanner(ctx, state);
       }
+      if (screen === SCREEN_TITLE) drawTitle(ctx, state, ui);
+      ctx.restore();
+      const title = screen === SCREEN_TITLE;
+      drawTopBar(ctx, state, ui, title);
+      drawSidePanel(ctx, state, ui, title);
+      drawBottomBar(ctx, state, ui, title);
+      if (screen === SCREEN_PAUSED) drawPause(ctx, ui);
+      if (screen === SCREEN_UPGRADE) drawUpgradeChoice(ctx, state, ui);
+      if (screen === SCREEN_RESULTS) drawResults(ctx, state, ui);
       ctx.restore();
     },
   };

@@ -1,88 +1,52 @@
-// Every tuning number and colour NIGHTLOOM uses, in one place: the field, the palette, the Weaver,
-// the loom (threads and loops), each kind of void-moth, the scoring tiers and the slow-time burst.
+// Every tuning number, colour and layout box NIGHTLOOM uses, in one place.
 
-/** Logical canvas size; the renderer scales it to fit the window. */
-export const FIELD = { width: 1280, height: 800 };
+/** The 1280x800 view, the HUD frame around the playfield, and the playfield (ARENA) whose own coordinates the world uses (FIELD). */
+export const VIEW = { width: 1280, height: 800 };
+export const LAYOUT = { top: 66, side: 312, bottom: 86 };
+export const ARENA = { x: 0, y: LAYOUT.top, width: VIEW.width - LAYOUT.side, height: VIEW.height - LAYOUT.top - LAYOUT.bottom };
+export const FIELD = { width: ARENA.width, height: ARENA.height };
 /** Fixed simulation step in seconds. */
 export const STEP = 1 / 60;
-/** localStorage key of the saved high score. */
 export const BEST_KEY = 'nightloom.best.v1';
 
-/** Gold and cyan light against violet darkness; the moths are dark with ember eyes. */
+/** Gold and cyan light over a twilight-violet and teal sky. */
 export const PALETTE = {
-  skyTop: '#1a0e3f',
-  skyMid: '#0c0622',
-  skyBottom: '#030109',
-  nebulaViolet: '122, 58, 214',
-  nebulaMagenta: '186, 64, 190',
-  nebulaTeal: '36, 150, 190',
-  gold: '#ffd36b',
-  goldLight: '#fff2c4',
-  goldDeep: '#e0a030',
-  cyan: '#74f3ff',
-  cyanDeep: '#2ec2dc',
-  violet: '#a27bff',
-  ember: '#ff3b2a',
-  emberGlow: '#ff8a45',
-  mothBody: '#120818',
-  mothWing: '#22113a',
-  mothEdge: '#7a4fb0',
-  mothAura: '#1c0636',
-  text: '#f6eeff',
-  textDim: '#a494cc',
-  heart: '#ff4d6d',
-  heartDim: '#4a2238',
+  skyTop: '#4a2a9c', skyMid: '#2c1a70', skyBottom: '#0f4060',
+  nebulaViolet: '170, 110, 255', nebulaMagenta: '245, 110, 225', nebulaTeal: '60, 220, 240',
+  gold: '#ffd36b', goldLight: '#fff2c4', goldDeep: '#e0a030',
+  cyan: '#74f3ff', cyanDeep: '#2ec2dc',
+  violet: '#b48cff', magenta: '#ff6ad5',
+  ember: '#ff3b2a', emberGlow: '#ff8a45',
+  mothBody: '#1a0a2e', mothWing: '#3d1d70', mothEdge: '#eadcff', mothAura: '#2a0a4a',
+  text: '#ffffff', textSoft: '#d9ccff', ink: '#160a30',
+  heart: '#ff4d6d', heartDim: '#4a2238',
+  panel: 'rgba(12, 6, 32, 0.94)', panelLine: '#6a4bb8',
+  win: '#4df0b0', lose: '#ff5a5a',
 };
 
-export const WEAVER = {
-  speed: 330,
-  radius: 11,
-  reach: 290,
-  hearts: 3,
-  maxHearts: 6,
-  invulnerable: 1.6,
-  trailLength: 14,
-};
-
-export const STARS = {
-  count: 16,
-  margin: 110,
-  spacing: 150,
-  hitRadius: 34,
-  topMargin: 150,
-  attractTopMargin: 330,
-};
-
+export const WEAVER = { speed: 330, radius: 11, reach: 270, hearts: 3, maxHearts: 6, invulnerable: 1.6, trailLength: 14 };
+export const STARS = { count: 15, margin: 70, spacing: 135, hitRadius: 34, topMargin: 76, attractTopMargin: 240 };
 export const LOOM = {
-  minLoop: 3,
-  flash: 0.7,
-  afterglow: 3,
-  attractAfterglow: 16,
-  cutSeconds: 0.8,
-  steadyCutSeconds: 1.8,
-  burnSeconds: 0.55,
-  cutterBurnSeconds: 1.6,
-  wideNet: 40,
+  minLoop: 3, flash: 0.7, afterglow: 3.5, attractAfterglow: 16, cutSeconds: 0.8, steadyCutSeconds: 1.8,
+  burnSeconds: 0.55, cutterBurnSeconds: 1.6, wideNet: 40, lodestar: 80, stunRadius: 90,
 };
-
 export const MOTHS = {
-  drifter: { radius: 17, speed: 58, points: 10, wingspan: 2.2 },
-  dasher: { radius: 16, speed: 75, dashSpeed: 660, points: 15, wingspan: 2.4 },
-  splitter: { radius: 25, speed: 36, points: 20, wingspan: 2.0, shedEvery: 7, maxMites: 4 },
-  mite: { radius: 9, speed: 120, points: 5, wingspan: 2.0 },
-  cutter: { radius: 17, speed: 100, points: 25, wingspan: 2.3 },
-  eclipse: { radius: 64, speed: 30, points: 1000, veilPoints: 150, wingspan: 2.6, escortEvery: 6, maxEscorts: 6 },
+  drifter: { radius: 17, speed: 58, points: 10 },
+  dasher: { radius: 16, speed: 75, dashSpeed: 660, points: 15 },
+  splitter: { radius: 25, speed: 36, points: 20, shedEvery: 7, maxMites: 4 },
+  mite: { radius: 9, speed: 120, points: 5 },
+  cutter: { radius: 17, speed: 100, points: 25 },
+  phantom: { radius: 17, speed: 68, points: 30, shown: 2.6, fade: 0.5, hidden: 1.8 },
+  warden: { radius: 22, speed: 30, points: 40, shieldRadius: 120 },
+  eclipse: { radius: 64, speed: 30, points: 1000, veilPoints: 150, escortEvery: 6, maxEscorts: 6 },
+  queen: { radius: 58, speed: 40, points: 1500, veilPoints: 200, escortEvery: 5, maxEscorts: 8, dashSpeed: 520 },
 };
-
+/** Loop area thresholds (px²) for tiers 2 to 4, the wave bonuses, the combo window, and the grade ladder of score against par × waves × (waves + 1). */
 export const SCORING = {
-  /** Loop area thresholds (px²) for tiers 2, 3 and 4. */
-  tiers: [38000, 110000, 230000],
-  tierNames: ['LOOP', 'BIG LOOP', 'GRAND LOOP', 'CELESTIAL LOOP'],
-  waveClear: 100,
-  perfectWave: 250,
-  comboWindow: 5,
+  tiers: [24000, 70000, 150000], tierNames: ['LOOP', 'BIG LOOP', 'GRAND LOOP', 'CELESTIAL LOOP'],
+  waveClear: 100, perfectWave: 250, comboWindow: 5, par: 250, grades: [['S', 1.5], ['A', 1], ['B', 0.65], ['C', 0.35], ['D', 0]],
 };
-
 export const SLOW_TIME = { factor: 0.28, duration: 3, cooldown: 12 };
-
 export const SPAWN = { interval: 0.85, firstDelay: 1.2, edgeInset: 30 };
+/** After this boss wave the cards offered are relics. */
+export const RELIC_WAVE = 5;

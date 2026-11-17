@@ -1,40 +1,53 @@
-// The upgrade cards offered between waves: what each one is called, what it does, how many times
-// it can be taken, and how picking one changes the world. Three are offered; the player keeps one.
-import { SLOW_TIME } from './config.js';
+// The cards between waves: nine thread upgrades in three rarities with levels and live stats, and four relics after the first boss.
+import { RELIC_WAVE, SLOW_TIME, WEAVER } from './config.js';
 import { growHearts } from './weaver.js';
 
 export const UPGRADES = [
-  { id: 'reach', name: 'Long Reach', max: 3, blurb: 'Threads anchor to stars farther from the Weaver.', effect: '+90 reach' },
-  { id: 'swift', name: 'Swift Spark', max: 3, blurb: 'The Weaver flies a quarter faster.', effect: '+25% speed' },
-  { id: 'ember', name: 'Ember Thread', max: 1, blurb: 'Moths that touch a held thread burn away.', effect: 'threads burn' },
-  { id: 'heart', name: 'Another Heart', max: 3, blurb: 'One more heart, and one healed now.', effect: '+1 heart' },
-  { id: 'still', name: 'Still Time', max: 2, blurb: 'Space slows every moth for a few seconds.', effect: 'Space: slow time' },
-  { id: 'shield', name: 'Star Shield', max: 1, blurb: 'Closing a loop shields the Weaver for 2.5 s.', effect: 'shield on snap' },
-  { id: 'gold', name: 'Gold Weave', max: 1, blurb: 'Every loop scores one tier higher.', effect: '+1 tier' },
-  { id: 'steady', name: 'Steady Hand', max: 1, blurb: 'Cutters need twice as long to sever a thread.', effect: 'slow cutters' },
-  { id: 'net', name: 'Wide Net', max: 1, blurb: 'Loops also catch moths just outside the thread.', effect: '+40 px catch' },
+  { id: 'reach', name: 'Long Reach', rarity: 'common', max: 3, blurb: 'Threads anchor to stars farther from the Weaver.', effect: '+90 reach', stat: (lv) => `reach ${WEAVER.reach + 90 * lv} px` },
+  { id: 'swift', name: 'Swift Spark', rarity: 'common', max: 3, blurb: 'The Weaver flies a quarter faster.', effect: '+25% speed', stat: (lv) => `speed ${Math.round(100 * 1.25 ** lv)}%` },
+  { id: 'heart', name: 'Another Heart', rarity: 'common', max: 3, blurb: 'One more heart, and one healed now.', effect: '+1 heart', stat: (lv) => `${WEAVER.hearts + lv} hearts` },
+  { id: 'ember', name: 'Ember Thread', rarity: 'rare', max: 1, blurb: 'Moths that linger on a held thread burn away.', effect: 'threads burn', stat: (lv) => (lv ? 'burns a moth in 0.55 s' : 'threads do not burn') },
+  { id: 'still', name: 'Still Time', rarity: 'rare', max: 2, blurb: 'Space slows every moth to a crawl for a few seconds.', effect: 'SPACE: still time', stat: (lv) => (lv ? `${SLOW_TIME.duration + 2 * (lv - 1)} s slow · ${Math.max(6, SLOW_TIME.cooldown - 4 * (lv - 1))} s recharge` : 'not held yet') },
+  { id: 'shield', name: 'Star Shield', rarity: 'rare', max: 1, blurb: 'Closing a loop shields the Weaver for 2.5 s.', effect: 'shield on snap', stat: (lv) => (lv ? '2.5 s shield per loop' : 'no shield') },
+  { id: 'steady', name: 'Steady Hand', rarity: 'rare', max: 1, blurb: 'Cutters need twice as long to sever a thread.', effect: 'slow cutters', stat: (lv) => `cut takes ${lv ? 1.8 : 0.8} s` },
+  { id: 'net', name: 'Wide Net', rarity: 'rare', max: 1, blurb: 'Loops also catch moths just outside the thread.', effect: '+40 px catch', stat: (lv) => `catch margin ${lv ? 40 : 0} px` },
+  { id: 'gold', name: 'Gold Weave', rarity: 'epic', max: 1, blurb: 'Every loop scores one tier higher.', effect: '+1 tier', stat: (lv) => (lv ? 'tier +1 on every loop' : 'tiers by area alone') },
 ];
 
-/** Fresh counts of every upgrade: none held. */
+export const RELICS = [
+  { id: 'moonspool', name: 'Moonspool', rarity: 'relic', max: 1, blurb: 'Held threads cannot be cut; cutters can only chase you.', effect: 'uncuttable threads', stat: () => 'threads cannot be cut' },
+  { id: 'starfall', name: 'Starfall', rarity: 'relic', max: 1, blurb: 'Every closed loop stuns the moths around it for 2 s.', effect: 'snap stuns nearby', stat: () => 'stuns within 90 px' },
+  { id: 'hourglass', name: 'Hourglass', rarity: 'relic', max: 1, blurb: 'Grants Still Time; every moth caught recharges a quarter of it.', effect: 'captures recharge', stat: () => '+25% charge per moth' },
+  { id: 'lodestar', name: 'Lodestar', rarity: 'relic', max: 1, blurb: 'Loops catch moths up to 80 px outside the thread.', effect: '+80 px catch', stat: () => 'catch margin 80 px' },
+];
+
+export const RARITY_COLORS = { common: '#74f3ff', rare: '#b48cff', epic: '#ffd36b', relic: '#ff6ad5' };
+const ROMAN = ['', 'I', 'II', 'III'];
+
+/** Fresh counts of every card: none held. */
 export function emptyUpgrades() {
   const held = {};
-  for (const upgrade of UPGRADES) held[upgrade.id] = 0;
+  for (const card of [...UPGRADES, ...RELICS]) held[card.id] = 0;
   return held;
 }
 
-/** Three cards the player does not already hold at the maximum, in a random order. */
-export function offerUpgrades(random, held) {
-  const candidates = UPGRADES.filter((upgrade) => (held[upgrade.id] || 0) < upgrade.max).map((upgrade) => upgrade.id);
-  random.shuffle(candidates);
-  return candidates.slice(0, 3);
-}
-
-/** The definition of an upgrade by id. */
+/** The definition of a card by id. */
 export function upgradeById(id) {
-  return UPGRADES.find((upgrade) => upgrade.id === id);
+  return UPGRADES.find((card) => card.id === id) || RELICS.find((card) => card.id === id);
 }
 
-/** Apply the upgrade `id` to the world and count it as held. */
+/** True when the wave just cleared earns a relic choice instead of a thread. */
+export function offersRelic(wave, held) {
+  return wave === RELIC_WAVE && !RELICS.some((relic) => held[relic.id] > 0);
+}
+
+/** Three cards for the wave just cleared: relics after the first boss, else threads not yet at their cap. */
+export function offerCards(random, held, wave) {
+  const pool = offersRelic(wave, held) ? RELICS : UPGRADES.filter((card) => held[card.id] < card.max);
+  return random.shuffle(pool.map((card) => card.id)).slice(0, 3);
+}
+
+/** Apply the card `id` to the world and count it as held. */
 export function applyUpgrade(world, id) {
   world.upgrades[id] = (world.upgrades[id] || 0) + 1;
   const weaver = world.weaver;
@@ -48,17 +61,20 @@ export function applyUpgrade(world, id) {
       world.slow.cooldown = Math.max(6, SLOW_TIME.cooldown - (world.upgrades.still - 1) * 4);
       world.slow.charge = 1;
       break;
+    case 'hourglass':
+      world.slow.owned = true;
+      world.slow.charge = 1;
+      break;
     default: break;
   }
 }
 
-/** Short badges for the HUD: the held upgrades with roman numerals for stacks. */
-export function upgradeBadges(held) {
-  const numerals = ['', 'I', 'II', 'III'];
-  const badges = [];
-  for (const upgrade of UPGRADES) {
-    const count = held[upgrade.id] || 0;
-    if (count > 0) badges.push({ id: upgrade.id, label: upgrade.max > 1 ? `${upgrade.name} ${numerals[count] || count}` : upgrade.name });
+/** The cards held, for the HUD: name with its level, rarity and current stat line. */
+export function heldCards(held) {
+  const rows = [];
+  for (const card of [...UPGRADES, ...RELICS]) {
+    const level = held[card.id] || 0;
+    if (level > 0) rows.push({ id: card.id, name: card.max > 1 ? `${card.name} ${ROMAN[level] || level}` : card.name, rarity: card.rarity, stat: card.stat(level) });
   }
-  return badges;
+  return rows;
 }

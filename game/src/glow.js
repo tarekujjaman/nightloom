@@ -1,15 +1,11 @@
-// Drawing helpers for light: pre-rendered glow sprites (a radial gradient on a small canvas, cheap
-// to stamp hundreds of times), glowing text, rounded boxes, word wrapping and the fonts.
+// Drawing helpers for light: glow sprites, glowing or outlined text, rounded boxes, word wrapping and the fonts.
 
-export const FONT_TITLE = "'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, 'Times New Roman', serif";
-export const FONT_UI = "'Segoe UI', 'Trebuchet MS', 'Helvetica Neue', Arial, sans-serif";
+export const FONT_TITLE = "'Palatino Linotype', Palatino, Georgia, serif";
+export const FONT_UI = "'Segoe UI', 'Trebuchet MS', Arial, sans-serif";
 
 /** '#rrggbb' to 'rgba(r, g, b, alpha)'. */
 export function rgba(hex, alpha) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  return `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${alpha})`;
 }
 
 /** A canvas holding a soft disc of `color` fading to nothing at `radius`. */
@@ -41,14 +37,20 @@ export function drawSprite(ctx, sprite, x, y, scale = 1, alpha = 1) {
   ctx.globalAlpha = previous;
 }
 
-/** Text with a coloured halo; `glow` is the halo colour, `blur` its spread. */
-export function glowText(ctx, text, x, y, { font = FONT_UI, size = 20, weight = '600', color = '#ffffff', glow = null, blur = 12, align = 'center', baseline = 'middle', alpha = 1, letterSpacing = 0 } = {}) {
+/** Text with an optional coloured halo (`glow`, spread `blur`) and/or a solid dark `outline`. */
+export function glowText(ctx, text, x, y, { font = FONT_UI, size = 20, weight = '800', color = '#ffffff', glow = null, blur = 12, align = 'center', baseline = 'middle', alpha = 1, letterSpacing = 0, outline = null } = {}) {
   ctx.save();
   ctx.globalAlpha *= alpha;
   ctx.font = `${weight} ${size}px ${font}`;
   ctx.textAlign = align;
   ctx.textBaseline = baseline;
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${letterSpacing}px`;
+  if (outline) {
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(3, size * 0.18);
+    ctx.strokeStyle = outline;
+    ctx.strokeText(text, x, y);
+  }
   ctx.fillStyle = color;
   if (glow) {
     ctx.shadowColor = glow;
@@ -61,7 +63,7 @@ export function glowText(ctx, text, x, y, { font = FONT_UI, size = 20, weight = 
 }
 
 /** Width of `text` at the given font, for layout. */
-export function measureText(ctx, text, { font = FONT_UI, size = 20, weight = '600', letterSpacing = 0 } = {}) {
+export function measureText(ctx, text, { font = FONT_UI, size = 20, weight = '800', letterSpacing = 0 } = {}) {
   ctx.save();
   ctx.font = `${weight} ${size}px ${font}`;
   if ('letterSpacing' in ctx) ctx.letterSpacing = `${letterSpacing}px`;
@@ -72,17 +74,14 @@ export function measureText(ctx, text, { font = FONT_UI, size = 20, weight = '60
 
 /** Break `text` into lines no wider than `maxWidth`. */
 export function wrapText(ctx, text, maxWidth, fontSpec) {
-  const words = text.split(' ');
   const lines = [];
   let line = '';
-  for (const word of words) {
+  for (const word of text.split(' ')) {
     const candidate = line ? `${line} ${word}` : word;
     if (measureText(ctx, candidate, fontSpec) > maxWidth && line) {
       lines.push(line);
       line = word;
-    } else {
-      line = candidate;
-    }
+    } else line = candidate;
   }
   if (line) lines.push(line);
   return lines;
@@ -93,14 +92,10 @@ export function roundRect(ctx, x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
   ctx.beginPath();
   ctx.moveTo(x + r, y);
-  ctx.lineTo(x + width - r, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-  ctx.lineTo(x + width, y + height - r);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-  ctx.lineTo(x + r, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
   ctx.closePath();
 }
 
@@ -110,10 +105,7 @@ export function sparklePath(ctx, x, y, radius, pinch = 0.28, rotation = 0) {
   for (let i = 0; i < 8; i += 1) {
     const angle = rotation + (i * Math.PI) / 4;
     const r = i % 2 === 0 ? radius : radius * pinch;
-    const px = x + Math.cos(angle) * r;
-    const py = y + Math.sin(angle) * r;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
+    ctx.lineTo(x + Math.cos(angle) * r, y + Math.sin(angle) * r);
   }
   ctx.closePath();
 }

@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- The judge's contact sheet, drawn by tools/contact.mjs: ?names=a.jpg,b.jpg,... under /screenshots/. -->
+<body style="margin:0;background:#fff">
+<canvas id="c" width="800" height="700"></canvas>
+<script>
+  const names = new URLSearchParams(location.search).get('names').split(',');
+  const ctx = document.getElementById('c').getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 800, 700);
+  function fit(img, x, y, w, h) {
+    const s = Math.min(w / img.width, h / img.height, 1);
+    ctx.drawImage(img, x + (w - img.width * s) / 2, y + (h - img.height * s) / 2, img.width * s, img.height * s);
+  }
+  Promise.all(names.map((name) => new Promise((ok, fail) => {
+    const img = new Image();
+    img.onload = () => ok(img);
+    img.onerror = () => fail(new Error(name));
+    img.src = `/screenshots/${name}`;
+  }))).then((images) => {
+    fit(images[0], 16, 16, 768, 480);
+    const rest = images.slice(1);
+    const cell = Math.min(250, (768 - (rest.length - 1) * 9) / rest.length);
+    rest.forEach((img, i) => fit(img, 16 + i * (cell + 9), 512, cell, cell * 0.625));
+    window.__ready = true;
+  });
+</script>
+</body>

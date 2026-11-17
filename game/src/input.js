@@ -1,24 +1,26 @@
-// Keyboard and mouse, read as the game needs them: WASD / arrows move the Weaver, the left mouse
-// button held over stars weaves, and one-shot actions (confirm, pause, mute, restart, slow time,
-// card picks) are collected as a bitfield the loop takes once per frame.
-import { FIELD } from './config.js';
+// Keyboard and mouse: WASD / arrows move, the held left button weaves, one-shot actions are a bitfield taken once a frame.
+import { ARENA } from './config.js';
 
-/**
- * Listen on the window and the canvas. `toLogical(clientX, clientY)` maps a client point to the
- * 1280x800 field; the renderer provides it since it knows the letterbox.
- */
+export const ACTION = { CONFIRM: 1, PAUSE: 2, MUTE: 4, RESTART: 8, SLOW: 16, PICK_1: 32, PICK_2: 64, PICK_3: 128, CLICK: 256 };
+
+const MOVE_KEYS = { KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1], KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0] };
+const KEY_ACTIONS = {
+  Enter: ACTION.CONFIRM, Space: ACTION.SLOW | ACTION.CONFIRM, KeyP: ACTION.PAUSE, Escape: ACTION.PAUSE, KeyM: ACTION.MUTE, KeyR: ACTION.RESTART,
+  Digit1: ACTION.PICK_1, Numpad1: ACTION.PICK_1, Digit2: ACTION.PICK_2, Numpad2: ACTION.PICK_2, Digit3: ACTION.PICK_3, Numpad3: ACTION.PICK_3,
+};
+
+/** Listen on the window and the canvas. */
 export function createInput(canvas, toLogical) {
   const held = new Set();
-  const control = { moveX: 0, moveY: 0, cursorX: FIELD.width / 2, cursorY: FIELD.height / 2, pressed: false };
+  const control = { moveX: 0, moveY: 0, cursorX: ARENA.width / 2, cursorY: ARENA.height / 2, viewX: 0, viewY: 0, pressed: false, slowPressed: false };
   let actions = 0;
   let firstGesture = null;
 
   function gesture() {
-    if (firstGesture) {
-      const call = firstGesture;
-      firstGesture = null;
-      call();
-    }
+    if (!firstGesture) return;
+    const call = firstGesture;
+    firstGesture = null;
+    call();
   }
 
   window.addEventListener('keydown', (event) => {
@@ -27,18 +29,7 @@ export function createInput(canvas, toLogical) {
     if (MOVE_KEYS[event.code] || event.code === 'Space') event.preventDefault();
     if (event.repeat) return;
     held.add(event.code);
-    actions |= ACTION_ANY_KEY;
-    switch (event.code) {
-      case 'Enter': actions |= ACTION_CONFIRM; break;
-      case 'Space': actions |= ACTION_SLOW | ACTION_CONFIRM; break;
-      case 'KeyP': case 'Escape': actions |= ACTION_PAUSE; break;
-      case 'KeyM': actions |= ACTION_MUTE; break;
-      case 'KeyR': actions |= ACTION_RESTART; break;
-      case 'Digit1': case 'Numpad1': actions |= ACTION_PICK_1; break;
-      case 'Digit2': case 'Numpad2': actions |= ACTION_PICK_2; break;
-      case 'Digit3': case 'Numpad3': actions |= ACTION_PICK_3; break;
-      default: break;
-    }
+    actions |= KEY_ACTIONS[event.code] || 0;
   });
   window.addEventListener('keyup', (event) => held.delete(event.code));
   window.addEventListener('blur', () => {
@@ -48,8 +39,10 @@ export function createInput(canvas, toLogical) {
 
   function trackPointer(event) {
     const point = toLogical(event.clientX, event.clientY);
-    control.cursorX = point.x;
-    control.cursorY = point.y;
+    control.viewX = point.x;
+    control.viewY = point.y;
+    control.cursorX = point.x - ARENA.x;
+    control.cursorY = point.y - ARENA.y;
   }
   window.addEventListener('pointermove', trackPointer);
   canvas.addEventListener('pointerdown', (event) => {
@@ -57,7 +50,7 @@ export function createInput(canvas, toLogical) {
     trackPointer(event);
     if (event.button === 0) {
       control.pressed = true;
-      actions |= ACTION_CLICK | ACTION_CONFIRM;
+      actions |= ACTION.CLICK | ACTION.CONFIRM;
     }
     event.preventDefault();
   });
@@ -99,21 +92,3 @@ export function createInput(canvas, toLogical) {
     },
   };
 }
-
-export const ACTION_CONFIRM = 1;
-export const ACTION_PAUSE = 2;
-export const ACTION_MUTE = 4;
-export const ACTION_RESTART = 8;
-export const ACTION_SLOW = 16;
-export const ACTION_PICK_1 = 32;
-export const ACTION_PICK_2 = 64;
-export const ACTION_PICK_3 = 128;
-export const ACTION_CLICK = 256;
-export const ACTION_ANY_KEY = 512;
-
-const MOVE_KEYS = {
-  KeyW: [0, -1], ArrowUp: [0, -1],
-  KeyS: [0, 1], ArrowDown: [0, 1],
-  KeyA: [-1, 0], ArrowLeft: [-1, 0],
-  KeyD: [1, 0], ArrowRight: [1, 0],
-};

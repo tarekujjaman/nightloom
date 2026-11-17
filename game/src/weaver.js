@@ -1,39 +1,25 @@
-// The Weaver: the player's spark of light. It moves with the keys, carries the spool whose reach
-// limits which stars can be woven, keeps the hearts, and blinks through a short grace after a hit.
+// The Weaver, the player's spark: movement, the spool's reach, hearts and the grace after a hit.
 import { FIELD, WEAVER } from './config.js';
 
 /** A fresh Weaver at the centre of the field with full hearts. */
 export function createWeaver() {
   return {
-    x: FIELD.width / 2,
-    y: FIELD.height / 2 + 40,
-    vx: 0,
-    vy: 0,
-    radius: WEAVER.radius,
-    reach: WEAVER.reach,
-    speedMult: 1,
-    hearts: WEAVER.hearts,
-    maxHearts: WEAVER.hearts,
-    invulnerable: 0,
-    shield: 0,
-    pulse: 0,
-    trail: [],
+    x: FIELD.width / 2, y: FIELD.height / 2 + 30, vx: 0, vy: 0, radius: WEAVER.radius, reach: WEAVER.reach, speedMult: 1,
+    hearts: WEAVER.hearts, maxHearts: WEAVER.hearts, invulnerable: 0, shield: 0, pulse: 0, trail: [],
   };
 }
 
 /** Move by `control` for `dt` seconds, easing toward the wanted velocity and staying in the field. */
 export function stepWeaver(weaver, control, dt) {
   const speed = WEAVER.speed * weaver.speedMult;
-  const wantX = control.moveX * speed;
-  const wantY = control.moveY * speed;
   const ease = 1 - Math.exp(-dt * 14);
-  weaver.vx += (wantX - weaver.vx) * ease;
-  weaver.vy += (wantY - weaver.vy) * ease;
+  weaver.vx += (control.moveX * speed - weaver.vx) * ease;
+  weaver.vy += (control.moveY * speed - weaver.vy) * ease;
   weaver.x = Math.max(weaver.radius, Math.min(FIELD.width - weaver.radius, weaver.x + weaver.vx * dt));
   weaver.y = Math.max(weaver.radius, Math.min(FIELD.height - weaver.radius, weaver.y + weaver.vy * dt));
   weaver.pulse += dt;
-  if (weaver.invulnerable > 0) weaver.invulnerable = Math.max(0, weaver.invulnerable - dt);
-  if (weaver.shield > 0) weaver.shield = Math.max(0, weaver.shield - dt);
+  weaver.invulnerable = Math.max(0, weaver.invulnerable - dt);
+  weaver.shield = Math.max(0, weaver.shield - dt);
   weaver.trail.push({ x: weaver.x, y: weaver.y });
   if (weaver.trail.length > WEAVER.trailLength) weaver.trail.shift();
 }
@@ -48,11 +34,6 @@ export function hurtWeaver(weaver) {
   weaver.hearts = Math.max(0, weaver.hearts - 1);
   weaver.invulnerable = WEAVER.invulnerable;
   return weaver.hearts === 0;
-}
-
-/** Restore `amount` hearts up to the maximum. */
-export function healWeaver(weaver, amount = 1) {
-  weaver.hearts = Math.min(weaver.maxHearts, weaver.hearts + amount);
 }
 
 /** Grow the heart capacity by one and fill the new heart. */
