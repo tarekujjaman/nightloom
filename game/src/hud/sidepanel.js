@@ -41,6 +41,23 @@ function row(ctx, x, y, w, kind, count, boss, time) {
   } else if (count > 0) label(ctx, `×${count}`, x + w - 8, y + 22, 20, P.text, 'right');
 }
 
+/** The four realms with their waves; in play the one the night is in is lit. */
+function realmList(ctx, x, w, inner, cy, current) {
+  tag(ctx, 'FOUR REALMS', inner, cy, P.violet, 13);
+  REALMS.forEach((realm, i) => {
+    const ry = cy + 24 + i * 21;
+    const lit = current < 0 || i === current;
+    ctx.fillStyle = realm.sky;
+    ctx.strokeStyle = realm.accent;
+    ctx.lineWidth = 2;
+    ctx.fillRect(inner, ry - 7, 22, 14);
+    ctx.strokeRect(inner, ry - 7, 22, 14);
+    label(ctx, realm.name.toUpperCase(), inner + 32, ry, 12, lit ? realm.accent : P.textSoft, 'left', 1);
+    glowText(ctx, i === current ? 'HERE' : `waves ${realm.first}–${realm.last}`, x + w - 14, ry, { ...SOFT, size: 11, align: 'right', color: lit ? P.text : P.textSoft });
+  });
+  return 34 + REALMS.length * 21;
+}
+
 export function drawSidePanel(ctx, state, ui, title) {
   const x = VIEW.width - LAYOUT.side;
   const y = ARENA.y;
@@ -80,34 +97,22 @@ export function drawSidePanel(ctx, state, ui, title) {
       nx += 24 + MOTH_INFO[kind].name.length * 7 + 14;
     }
     cy += 28;
-  } else {
-    cy += 14;
-    tag(ctx, 'FOUR REALMS', inner, cy, P.violet, 13);
-    REALMS.forEach((realm, i) => {
-      const ry = cy + 24 + i * 21;
-      ctx.fillStyle = realm.sky;
-      ctx.strokeStyle = realm.accent;
-      ctx.lineWidth = 2;
-      ctx.fillRect(inner, ry - 7, 22, 14);
-      ctx.strokeRect(inner, ry - 7, 22, 14);
-      label(ctx, realm.name.toUpperCase(), inner + 32, ry, 12, realm.accent, 'left', 1);
-      glowText(ctx, `waves ${realm.first}–${realm.last}`, x + w - 14, ry, { ...SOFT, size: 11, align: 'right' });
-    });
-    cy += 34 + REALMS.length * 21;
-  }
+  } else cy += realmList(ctx, x, w, inner, cy + 14, -1) + 14;
   tag(ctx, 'THREADS HELD', inner, cy, P.gold, 13);
   cy += 18;
   const held = heldCards(state.upgrades);
   if (title || held.length === 0) {
     const lines = title ? ['One card after every wave: ten threads,', 'a fourth for starlight, relics after the boss.'] : ['none yet · one card after every wave'];
     lines.forEach((text, i) => glowText(ctx, text, inner, cy + 16 + i * 18, { ...SOFT, size: 12.5 }));
-    return;
+    cy += 24 + lines.length * 18;
+  } else {
+    const rowH = Math.max(26, Math.min(36, (y + h - 10 - cy) / held.length));
+    for (const card of held) {
+      drawUpgradeIcon(ctx, card.id, inner + 16, cy + rowH / 2, Math.min(22, rowH - 10));
+      label(ctx, card.name.toUpperCase(), inner + 38, cy + rowH / 2 - (rowH > 30 ? 7 : 0), 13.5, RARITY_COLORS[card.rarity], 'left', 0.5);
+      if (rowH > 30) glowText(ctx, card.stat, inner + 38, cy + rowH / 2 + 9, { ...SOFT, size: 11.5 });
+      cy += rowH;
+    }
   }
-  const rowH = Math.max(26, Math.min(36, (y + h - 10 - cy) / held.length));
-  for (const card of held) {
-    drawUpgradeIcon(ctx, card.id, inner + 16, cy + rowH / 2, Math.min(22, rowH - 10));
-    label(ctx, card.name.toUpperCase(), inner + 38, cy + rowH / 2 - (rowH > 30 ? 7 : 0), 13.5, RARITY_COLORS[card.rarity], 'left', 0.5);
-    if (rowH > 30) glowText(ctx, card.stat, inner + 38, cy + rowH / 2 + 9, { ...SOFT, size: 11.5 });
-    cy += rowH;
-  }
+  if (!title && y + h - cy >= 150) realmList(ctx, x, w, inner, cy + 22, Math.max(0, state.realm));
 }

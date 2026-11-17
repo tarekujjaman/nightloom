@@ -76,7 +76,7 @@ function runGame() {
 
   function backToTitle() {
     world = createWorld((gameSeed ^ 0x9e3779b9) >>> 0, true);
-    startWave(world, 3);
+    startWave(world, 4);
     pilot = createAttractPilot();
     screen = SCREEN_TITLE;
     announce('NIGHTLOOM. Click to begin.');

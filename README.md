@@ -33,7 +33,8 @@ and the two banners: **WIN** (weave all 10 waves, with the waves woven so far) a
 unravels or the Weaver falls, with the Loom's health and the hearts left). The right-hand panel is the
 **THREAT QUEUE**: every kind of moth still coming this wave with its icon, name, one-line behaviour and
 bite, the boss with its veils and phase, and what spawns next; beneath it **THREADS HELD** lists the
-cards taken with their level and live stat. The bottom bar has the hearts, the **hotbar** (LMB WEAVE ·
+cards taken with their level and live stat, and while there is room the **FOUR REALMS** with the one
+the night is in lit. The bottom bar has the hearts, the **hotbar** (LMB WEAVE ·
 RMB PLUCK · SPACE STILL TIME · E STAR with its starlight cost · Q LANCE with its charges, each with a
 cooldown sweep), the combo meter, the high score and the run grade (S to D, the score against par). A
 boss bar crosses the top of the field while a boss lives, a realm title card opens each realm, and a
@@ -45,8 +46,9 @@ Weaver and the **LOOP CLOSED** callout carry words.
 
 - **WASD / arrow keys** move the Weaver. Only stars inside its reach circle can be woven.
 - **Hold the left mouse button** on a star, then drag star to star to chain glowing threads.
-  **Return to the first star** to snap the loop shut. Bigger loops score higher tiers, more moths
-  multiply the catch, and loops closed within five seconds chain into a combo.
+  **Return to the first star** to snap the loop shut: the moths inside dissolve in gold. Bigger loops
+  score higher tiers, more moths multiply the catch, and loops closed within five seconds chain into
+  a combo. Every wave opens with at least three stars inside the reach circle.
 - **Right mouse button** plucks the held thread, whipping away and stunning the moths along it (or,
   with no thread held, the moths around the Weaver). Four seconds to recharge.
 - **Space** fires Still Time, slowing every moth for a few seconds; it recharges over 14 s.
@@ -98,7 +100,9 @@ under `game/art/`, and every sound is synthesised with the Web Audio API. `?seed
   `--check` repaints and compares without writing.
 - `node tools/shoot.mjs` serves the repository, drives headless Chrome over the DevTools protocol
   and writes the scenes in `shots.json` (`?shot=play|title|upgrade|results&seed=N`, staged by
-  `tools/stage.mjs`, which the game imports only under `?shot=`) to `screenshots/`.
+  `tools/stage.mjs`, which the game imports only under `?shot=`) to `screenshots/`. The cover is
+  wave 3 in Aurora Reach; `?shot=play&realm=1` stages the same moment in the Ember Nebula round
+  the Eclipse Moth.
 - `node tools/contact.mjs` lays the screenshots out as the judge's contact sheet (the cover inside
   768x480, the rest small beneath it) in `out/contact.jpg`.
 - `node tools/check.mjs` plays the game through in headless Chrome (start, every art file loading,

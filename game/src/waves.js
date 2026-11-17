@@ -4,7 +4,7 @@ export const WAVE_COUNT = 10;
 
 export const WAVES = [
   { name: 'First Light', tagline: 'Drifters wander in toward the Loom', tip: 'Loop the Drifters before they reach the Loom: hold LMB on a star, drag star to star, back to the first', moths: { drifter: 6 } },
-  { name: 'Wings in the Dark', tagline: 'Dashers aim, then lunge', tip: 'Dashers lunge where you stand: step aside, then loop them while they aim', moths: { drifter: 7, dasher: 3 } },
+  { name: 'Wings in the Dark', tagline: 'Dashers aim, then lunge', tip: 'Dashers lunge where you stand: step aside, then loop them while they aim', moths: { drifter: 7, dasher: 2 } },
   { name: 'The Brood', tagline: 'Splitters shed mites until caught', tip: 'Loop the Splitters before they shed; E plants a star where you stand', moths: { drifter: 7, dasher: 3, splitter: 2 } },
   { name: 'Severance', tagline: 'Cutters chew through held threads', tip: 'Cutters chew a held thread: close loops fast, or pluck them off (RMB)', moths: { drifter: 7, dasher: 4, splitter: 2, cutter: 2 } },
   { name: 'The Eclipse Moth', tagline: 'Close three loops around it', tip: 'Close a loop around the Eclipse Moth to strip a veil', boss: { kind: 'eclipse', veils: 3 }, moths: { drifter: 4, dasher: 2 } },

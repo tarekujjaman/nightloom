@@ -1,9 +1,9 @@
 // The screenshot scenes behind ?shot=play|title|upgrade|results: real game state staged to its best moment. Lives beside the tools (main.js imports it only under ?shot), so the hand-in's game/ stays lean.
 import { ATTRACT, FIELD, LOOM, STEP } from '../game/src/config.js';
 import { PHASE, createWorld, startWave, stepWorld } from '../game/src/world.js';
-import { chooseCluster, createAttractPilot, pilotControl } from '../game/src/attract.js';
+import { createAttractPilot, pilotControl } from '../game/src/attract.js';
 import { applyUpgrade } from '../game/src/upgrades.js';
-import { anchorThread, distanceToPolygonEdge, extendThread, pointInPolygon, polygonCentroid } from '../game/src/threads.js';
+import { anchorThread, distanceToPolygonEdge, extendThread, nearestOnSegment, pointInPolygon, polygonCentroid } from '../game/src/threads.js';
 import { spawnMoth } from '../game/src/enemies.js';
 import { findBoss, stripVeil } from '../game/src/bosses.js';
 import { SCREEN_PLAY, SCREEN_RESULTS, SCREEN_TITLE, SCREEN_UPGRADE } from '../game/src/render.js';
@@ -50,13 +50,13 @@ function titleClutter(state) {
   return cost;
 }
 
-/** The attract scene at its tidiest fresh loop in 45 s: one pass scores each, a second (the night replays alike) stops there. */
+/** The attract scene (its Ember Nebula wave, so the sheet shows a second realm beside the cover's Aurora) at its tidiest fresh loop in 45 s: one pass scores each, a second (the night replays alike) stops there. */
 function stageTitle(seed) {
   let best = { step: Math.round(20 / STEP), cost: Infinity };
   let state;
   for (const pass of [0, 1]) {
     state = createWorld(seed, true);
-    startWave(state, 3);
+    startWave(state, 4);
     const pilot = createAttractPilot();
     const steps = pass === 0 ? Math.round(45 / STEP) : best.step;
     for (let i = 0; i < steps; i += 1) {
@@ -69,90 +69,79 @@ function stageTitle(seed) {
   return { state, screen: SCREEN_TITLE, ui: UI };
 }
 
-/** Wave 5 in the Ember Nebula on the Weavers' Hill: the Eclipse Moth caught inside a closing loop beside the village with escorts, the callout above, starlight flying, a lance pinning a dasher, the Loom torn to 58 and standing clear. */
-function stagePlay(seed) {
-  const pilot = createAttractPilot();
-  const state = night(seed, ['reach', 'reach', 'swift', 'ember', 'heart', 'mend', 'gold'], 5, 14, pilot);
+/** The cover's loop: six stars filling the western third of the field, clear of the tower; the catch sits in its lower half, the callout lands in its upper half. */
+const RING = [[82, 112], [270, 100], [330, 312], [280, 552], [92, 574], [42, 346]];
+/** The new thread on the eastern slope: anchored at the first star, drawn to the second, the cursor on its way to the third. */
+const HELD = [[676, 168], [914, 236], [848, 470]];
+const CURSOR = { x: 870, y: 392 };
+
+/** Wave 3 in Aurora Reach (wave 5 in the Ember Nebula round the Eclipse Moth with ?realm=1): a loop just snapped shut round seven moths, which dissolve in gold under the LOOP CLOSED callout, while the Weaver already holds a new thread on the eastern slope and more moths fly in at the torn Loom. Aurora was kept for the cover because its snow and teal give the clearest contrast for the threads, the moths, the Loom and the village. */
+function stagePlay(seed, realm) {
+  const ember = realm === 1;
+  const state = night(seed, ember ? ['reach', 'reach', 'swift', 'ember', 'heart', 'mend', 'gold'] : ['reach', 'heart'], ember ? 5 : 3, 14, createAttractPilot());
   const { weaver, random } = state;
-  const boss = findBoss(state.moths);
-  Object.assign(boss, { veils: 3, maxVeils: 3, alive: true, stun: 0 });
-  stripVeil(boss);
-  Object.assign(boss, { veils: 3, stun: 0 });
+  const boss = ember ? findBoss(state.moths) : null;
+  if (boss) {
+    Object.assign(boss, { veils: 3, maxVeils: 3, alive: true, stun: 0 });
+    stripVeil(boss);
+    Object.assign(boss, { veils: 3, stun: 0 });
+  }
   state.weave.afterglows = [];
+  state.effects.caught = [];
   weaver.hearts = 3;
-  Object.assign(state.combo, { best: 18, chain: 2, lastCapture: state.time });
-  Object.assign(state, { score: 23480, spawnQueue: ['dasher', 'drifter'], spawnTimer: 9, pending: [] });
+  Object.assign(state.combo, { best: ember ? 18 : 8, chain: 4, lastCapture: state.time });
+  Object.assign(state, { score: ember ? 23480 : 6140, spawnQueue: ['dasher', 'drifter'], spawnTimer: 9, pending: [] });
   state.stats.waveCaptured = 9;
-  Object.assign(state.starlight, { have: 186, shown: 186 });
+  Object.assign(state.starlight, { have: ember ? 186 : 94, shown: ember ? 186 : 94 });
   Object.assign(state.abilities, { pluck: 2.6, charges: 2, recharge: 3.1 });
   state.slow.charge = 0.7;
-  // The loop: a pentagon of stars on the western slope, wholly clear of the tower (balancing the side panel), built by moving the five westernmost stars onto it; stars left standing on the tower go.
-  const ring = [[190, 284], [312, 372], [266, 516], [114, 516], [68, 372]].map(([x, y]) => ({ x: x + random.range(-10, 10), y: y + random.range(-8, 8) }));
+  // The loop's six stars and the held thread's three are made by moving the nine westernmost stars; the rest stay if they are clear of the tower, the loop and the thread.
+  const ring = RING.map(([x, y]) => ({ x: x + random.range(-6, 6), y: y + random.range(-6, 6) }));
+  const targets = [...ring, ...HELD.map(([x, y]) => ({ x, y }))];
   const byX = state.stars.slice().sort((a, b) => a.x - b.x);
-  const chosen = byX.slice(0, 5);
-  const rest = byX.slice(5).filter((s) => clearOfTower(s.x, s.y, 10) && ring.every((p) => Math.hypot(p.x - s.x, p.y - s.y) >= 100));
-  const moved = ring.map((target) => {
-    const star = chosen.splice(chosen.map((s, i) => [Math.hypot(s.x - target.x, s.y - target.y), i]).sort((a, b) => a[0] - b[0])[0][1], 1)[0];
-    return Object.assign(star, target);
-  });
+  const chosen = byX.slice(0, targets.length);
+  const moved = targets.map((target) => Object.assign(chosen.splice(chosen.map((s, i) => [Math.hypot(s.x - target.x, s.y - target.y), i]).sort((a, b) => a[0] - b[0])[0][1], 1)[0], target));
+  const polygon = moved.slice(0, 6);
+  const heldSegment = (x, y) => Math.min(nearestOnSegment(x, y, HELD[0][0], HELD[0][1], HELD[1][0], HELD[1][1]).distance, nearestOnSegment(x, y, HELD[1][0], HELD[1][1], CURSOR.x, CURSOR.y).distance);
+  const rest = byX.slice(targets.length).filter((s) => clearOfTower(s.x, s.y, 10) && !pointInPolygon(s.x, s.y, polygon) && targets.every((p) => Math.hypot(p.x - s.x, p.y - s.y) >= 100) && heldSegment(s.x, s.y) > 70);
   state.stars = [...moved, ...rest];
-  const choice = { cluster: [0, 1, 2, 3, 4], centre: polygonCentroid(moved) };
-  const polygon = moved;
-  const centre = choice.centre;
   const { stars } = state;
-  boss.x = centre.x;
-  boss.y = centre.y + 12;
-  state.moths = [boss];
-  moved[1].placed = true;
-  moved[4].placed = true;
-  let spot = { room: 0 };
-  polygon.forEach((a, i) => {
-    const b = polygon[(i + 1) % polygon.length];
-    const length = Math.hypot(b.x - a.x, b.y - a.y);
-    for (const side of [1, -1]) {
-      const x = (a.x + b.x) / 2 + (side * (b.y - a.y) * 90) / length;
-      const y = (a.y + b.y) / 2 - (side * (b.x - a.x) * 90) / length;
-      const room = Math.min(...stars.map((star) => Math.hypot(star.x - x, star.y - y)));
-      if (room > spot.room && !pointInPolygon(x, y, polygon) && clearOfTower(x, y, 30) && x > 90 && x < FIELD.width - 90 && y > 140 && y < FIELD.height - 110) spot = { x, y, room };
-    }
+  polygon[2].placed = true;
+  polygon[5].placed = true;
+  const centre = polygonCentroid(polygon);
+  const hero = { x: centre.x, y: centre.y + 86 };
+  state.moths = boss ? [Object.assign(boss, hero)] : [];
+  if (!boss) placeMoth(state, 'splitter', hero.x, hero.y);
+  // The escorts ring the catch at its sides and below, leaving the callout's room above and the boss's name tag beneath.
+  [-0.4, 0.25, 0.8, 2.3, 2.9, 3.5].forEach((angle, i) => {
+    let r = 108 + (i % 2) * 14;
+    while (r > 40 && !pointInPolygon(hero.x + Math.cos(angle) * r, hero.y + Math.sin(angle) * r, polygon)) r -= 10;
+    placeMoth(state, ['dasher', 'drifter', 'mite', 'drifter', 'cutter', 'dasher'][i], hero.x + Math.cos(angle) * r, hero.y + Math.sin(angle) * r);
   });
-  Object.assign(weaver, { x: spot.x, y: spot.y, trail: [] });
-  ['mite', 'dasher', 'mite', 'cutter', 'drifter', 'drifter'].forEach((kind, i) => {
-    const angle = (i / 6) * Math.PI * 2 + 0.4;
-    let r = 120;
-    while (r > 40 && !pointInPolygon(boss.x + Math.cos(angle) * r, boss.y + Math.sin(angle) * r, polygon)) r -= 10;
-    placeMoth(state, kind, boss.x + Math.cos(angle) * r, boss.y + Math.sin(angle) * r);
-  });
-  const free = (x, y, gap) => clearOfTower(x, y, 36) && !pointInPolygon(x, y, polygon) && distanceToPolygonEdge(x, y, polygon) >= 80 && ![...state.moths, weaver].some((o) => Math.hypot(o.x - x, o.y - y) < gap) && !stars.some((s) => Math.hypot(s.x - x, s.y - y) < 60);
-  for (const kind of ['drifter', 'dasher', 'cutter', 'splitter', 'drifter', 'dasher', 'cutter', 'drifter', 'dasher', 'mite', 'mite']) {
+  Object.assign(weaver, { x: 722, y: 236, trail: [] });
+  const free = (x, y, gap) => clearOfTower(x, y, 36) && !pointInPolygon(x, y, polygon) && distanceToPolygonEdge(x, y, polygon) >= 80 && heldSegment(x, y) > 56 && ![...state.moths, weaver].some((o) => Math.hypot(o.x - x, o.y - y) < gap) && !stars.some((s) => Math.hypot(s.x - x, s.y - y) < 60);
+  for (const kind of ['drifter', 'cutter', 'splitter', 'drifter', 'dasher', 'mite']) {
     for (let tries = 0; tries < 600; tries += 1) {
       const x = random.range(60, FIELD.width - 60);
-      const y = random.range(110, FIELD.height - 80);
-      if (!free(x, y, 125)) continue;
+      const y = random.range(110, FIELD.height - 100);
+      if (!free(x, y, 120)) continue;
       placeMoth(state, kind, x, y);
       break;
     }
   }
   // Two moths out of the dark edge, flying in at the Loom.
-  for (const [kind, x, y] of [['drifter', 40, 250], ['dasher', FIELD.width - 50, 300]]) {
+  for (const [kind, x, y] of [['drifter', FIELD.width - 46, 330], ['dasher', 560, FIELD.height - 70]]) {
     if (free(x, y, 90)) placeMoth(state, kind, x, y).heading = Math.atan2(LOOM.y - y, LOOM.x - x);
   }
-  for (let angle = 0; angle < Math.PI * 2; angle += 0.3) {
-    const x = weaver.x + Math.cos(angle) * 190;
-    const y = weaver.y + Math.sin(angle) * 190;
-    if (x < 70 || x > FIELD.width - 70 || y < 130 || y > FIELD.height - 100 || !free(x, y, 90)) continue;
-    const pinned = placeMoth(state, 'dasher', x, y);
-    Object.assign(pinned, { pinned: 1.8, stun: 1.8, heading: angle + Math.PI / 2 });
-    state.abilities.lances.push({ x: x + Math.cos(angle) * 36, y: y + Math.sin(angle) * 36, dx: Math.cos(angle), dy: Math.sin(angle), travelled: 230, hit: [pinned.id] });
-    break;
-  }
-  anchorThread(state.weave, choice.cluster[0]);
-  for (let i = 1; i < choice.cluster.length; i += 1) extendThread(state.weave, choice.cluster[i]);
-  const first = stars[choice.cluster[0]];
-  for (let i = 0; i < 38; i += 1) stepWorld(state, { ...IDLE, cursorX: first.x, cursorY: first.y, pressed: true }, STEP);
-  // The loop just stripped a veil: the phase banner and floating labels would sit on the callout, so they go.
+  // The loop closes, the button lifts, and a new thread is anchored and drawn east: a third of a second in all, so the flash has settled into the gold afterglow while the bursts and the dissolving catch still show.
+  anchorThread(state.weave, 0);
+  for (let i = 1; i < 6; i += 1) extendThread(state.weave, i);
+  const at = (star, pressed = true) => ({ ...IDLE, cursorX: star.x, cursorY: star.y, pressed });
+  for (const control of [at(stars[0]), at(stars[0], false), at(stars[6]), at(stars[7]), ...Array(16).fill(at(CURSOR))]) stepWorld(state, control, STEP);
+  // The loop just stripped a veil: the phase banner, the floating labels and the starlight motes would sit on the callout, so they go.
   state.banner = null;
   state.effects.texts = [];
+  state.starlight.motes = [];
   state.loom.health = 58;
   return { state, screen: SCREEN_PLAY, ui: UI };
 }
@@ -179,7 +168,7 @@ function stageResults(seed) {
 }
 
 export function stageShot(name, seed) {
-  if (name === 'play') return stagePlay(seed);
+  if (name === 'play') return stagePlay(seed, Number(new URLSearchParams(window.location.search).get('realm') ?? 0));
   if (name === 'upgrade') return stageUpgrade(seed);
   if (name === 'results') return stageResults(seed);
   return stageTitle(seed);

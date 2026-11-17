@@ -1,6 +1,6 @@
 // Sparks, floating labels, screen shake and colour flashes.
 
-export const createEffects = () => ({ particles: [], texts: [], shake: 0, shakeX: 0, shakeY: 0, redFlash: 0, goldFlash: 0, cyanFlash: 0 });
+export const createEffects = () => ({ particles: [], texts: [], caught: [], shake: 0, shakeX: 0, shakeY: 0, redFlash: 0, goldFlash: 0, cyanFlash: 0 });
 
 export function burst(effects, random, x, y, { count = 16, colors = ['#ffd36b'], speed = 220, life = 0.7, size = 3, drag = 2.5, gravity = 0 } = {}) {
   for (let i = 0; i < count; i += 1) {
@@ -31,6 +31,7 @@ export function stepEffects(effects, random, dt) {
   if (effects.particles.length > 900) effects.particles.splice(0, effects.particles.length - 900);
   for (const t of effects.texts) t.age += dt;
   effects.texts = effects.texts.filter((t) => t.age < t.life);
+  effects.caught = effects.caught.filter((moth) => (moth.gone += dt / 0.6) < 1);
   effects.shake = Math.max(0, effects.shake - dt * 40);
   effects.shakeX = effects.shake > 0 ? (random.next() * 2 - 1) * effects.shake : 0;
   effects.shakeY = effects.shake > 0 ? (random.next() * 2 - 1) * effects.shake : 0;

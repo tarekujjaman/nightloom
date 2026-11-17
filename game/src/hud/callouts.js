@@ -6,6 +6,7 @@ import { BOSSES, bossPhase, findBoss } from '../bosses.js';
 import { waveDefinition } from '../waves.js';
 import { PHASE } from '../world.js';
 import { starCost } from '../starlight.js';
+import { starInReach } from '../stars.js';
 import { pill, segments, tag, tagCentred, tagWidth } from './widgets.js';
 
 const THREAD_TIPS = ['Drag the thread to a second star, then a third', 'One more star, then back to the first', 'Back to the first star snaps the loop shut'];
@@ -57,12 +58,12 @@ export function drawCallout(ctx, state) {
   const top = state.banner ? 330 : findBoss(state.moths) ? 180 : 100;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.translate(Math.max(150, Math.min(FIELD.width - 150, c.x)), Math.max(top, Math.min(FIELD.height - 110, c.y - 100 - c.age * 14)));
+  ctx.translate(Math.max(170, Math.min(FIELD.width - 170, c.x)), Math.max(top, Math.min(FIELD.height - 110, c.y - 100 - c.age * 14)));
   ctx.scale(pop, pop);
   tagCentred(ctx, 'LOOP CLOSED!', 0, -62, P.cyan, 16, 12);
   glowText(ctx, `+${formatScore(c.points)}`, 0, -12, { size: 52, color: P.goldLight, glow: P.gold, blur: 22, outline: P.ink });
-  glowText(ctx, `${c.tier} · ${c.count} MOTH${c.count === 1 ? '' : 'S'}`, 0, 30, { size: 18, color: P.text, outline: P.ink, letterSpacing: 1 });
-  glowText(ctx, `×${Math.round(c.multiplier * 10) / 10}${c.chain > 1 ? ` · ${c.chain}-LOOP CHAIN` : ''}`, 0, 54, { size: 17, color: c.chain > 1 ? P.magenta : P.gold, outline: P.ink, letterSpacing: 1 });
+  glowText(ctx, `${c.tier} · ${c.count} MOTH${c.count === 1 ? '' : 'S'}`, 0, 31, { size: 18.5, color: P.text, outline: P.ink, letterSpacing: 0.5 });
+  glowText(ctx, `×${Math.round(c.multiplier * 10) / 10}${c.chain > 1 ? ` · ${c.chain}-LOOP CHAIN` : ''}`, 0, 56, { size: 18, color: c.chain > 1 ? P.magenta : P.gold, outline: P.ink, letterSpacing: 1 });
   ctx.restore();
 }
 
@@ -74,6 +75,7 @@ export function objective(state) {
   const boss = findBoss(state.moths);
   if (boss) return BOSSES[boss.kind].tips[bossPhase(boss)].replace('#', boss.veils);
   if (starlight.have >= starCost(state) && !stars.some((star) => Math.hypot(star.x - weaver.x, star.y - weaver.y) < 150)) return `No star near you: E plants one here for ${starCost(state)} starlight`;
+  if (stars.filter((star) => starInReach(star, weaver.x, weaver.y, weaver.reach)).length < 3) return 'Fewer than three stars in your circle: walk (WASD) toward the stars to weave a loop';
   return waveDefinition(state.wave).tip;
 }
 

@@ -56,14 +56,23 @@ export function createRenderer(canvas) {
     ctx.shadowBlur = 0;
   }
 
+  /** A thread: a cyan halo added to the scene, then a solid gold core with a pale heart, so it stays gold over the glow. */
+  function threadStroke(color, alpha, width = 1) {
+    glowStroke(P.cyan, 16 * width, 28, 0.55 * alpha);
+    ctx.globalCompositeOperation = 'source-over';
+    glowStroke(color, 6 * width, 0, alpha);
+    glowStroke(P.goldLight, 2 * width, 0, 0.9 * alpha);
+    lighter(ctx);
+  }
+
   function fillNet(polygon, color, alpha, time) {
     ctx.save();
     poly(ctx, polygon);
     ctx.clip();
-    ctx.fillStyle = rgba(color, 0.13 * alpha);
+    ctx.fillStyle = rgba(color, 0.2 * alpha);
     ctx.fillRect(0, 0, FIELD.width, FIELD.height);
-    ctx.strokeStyle = rgba(color, 0.24 * alpha);
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = rgba(color, 0.32 * alpha);
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     const shift = (time * 10) % 24;
     for (let d = -FIELD.height; d < FIELD.width + FIELD.height; d += 24) {
@@ -86,8 +95,24 @@ export function createRenderer(canvas) {
       lighter(ctx);
       ctx.lineJoin = 'round';
       poly(ctx, glow.polygon);
-      glowStroke(color, 6, 18, 0.75 * alpha);
-      for (const p of glow.polygon) drawSprite(ctx, sprites.star, p.x, p.y, 0.9, 0.6 * alpha);
+      threadStroke(color === P.cyan ? P.cyanDeep : color, alpha, 1.1);
+      for (const p of glow.polygon) drawSprite(ctx, sprites.star, p.x, p.y, 1.2, 0.8 * alpha);
+      ctx.restore();
+    }
+  }
+
+  /** Moths a loop just caught dissolve in gold for a moment, so the catch is seen, not only its burst. */
+  function drawCaught(state) {
+    for (const moth of state.effects.caught) {
+      const k = moth.gone;
+      ctx.save();
+      ctx.globalAlpha = 1 - k * k;
+      ctx.translate(moth.x, moth.y);
+      ctx.scale(1 - 0.4 * k, 1 - 0.4 * k);
+      ctx.translate(-moth.x, -moth.y);
+      drawMoth(ctx, moth, state.time);
+      lighter(ctx);
+      drawSprite(ctx, sprites.weaver, moth.x, moth.y, (moth.radius / 30) * (1 + k), 0.9);
       ctx.restore();
     }
   }
@@ -136,8 +161,7 @@ export function createRenderer(canvas) {
         const amp = weave.pluckWave * 18 * Math.sin(state.time * 45 + i);
         ctx.quadraticCurveTo((a.x + b.x) / 2 - ((b.y - a.y) / d) * amp, (a.y + b.y) / 2 + ((b.x - a.x) / d) * amp, b.x, b.y);
       }
-      glowStroke(P.cyan, 12, 24, 0.55);
-      glowStroke(P.goldLight, 3.5, 0, 1);
+      threadStroke(P.gold, 1);
       for (let i = 0; i + 1 < points.length; i += 1) {
         for (let k = 0; k < 2; k += 1) {
           const t = (state.time * 0.55 + k * 0.5 + i * 0.21) % 1;
@@ -147,14 +171,14 @@ export function createRenderer(canvas) {
     }
     if (weave.active) {
       const last = points[points.length - 1];
-      ctx.strokeStyle = rgba(P.cyan, 0.6);
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([8, 7]);
+      ctx.strokeStyle = rgba(P.cyan, 0.75);
+      ctx.lineWidth = 3;
+      ctx.setLineDash([10, 8]);
       ctx.lineDashOffset = -state.time * 60;
       poly(ctx, [last, { x: weave.cursorX, y: weave.cursorY }], false);
       ctx.stroke();
       ctx.setLineDash([]);
-      drawSprite(ctx, sprites.spark, weave.cursorX, weave.cursorY, 1.4, 0.9);
+      drawSprite(ctx, sprites.spark, weave.cursorX, weave.cursorY, 1.6, 0.9);
     }
     if (weave.cut) {
       const p = weave.cut.progress;
@@ -168,10 +192,10 @@ export function createRenderer(canvas) {
     for (const flash of weave.flashes) {
       const alpha = (1 - flash.age / WEAVE.flash) ** 1.5;
       poly(ctx, flash.polygon);
-      ctx.fillStyle = rgba(P.goldDeep, 0.2 * alpha);
+      ctx.fillStyle = rgba(P.goldDeep, 0.28 * alpha);
       ctx.fill();
-      glowStroke(P.cyan, 10, 30, 0.8 * alpha);
-      glowStroke('#ffffff', 2.5 + 2 * alpha, 18, alpha);
+      glowStroke(P.cyan, 14, 36, 0.8 * alpha);
+      glowStroke('#ffffff', 3 + 3 * alpha, 18, alpha);
     }
     ctx.restore();
   }
@@ -245,6 +269,7 @@ export function createRenderer(canvas) {
     drawAfterglows(state);
     if (!lost) drawAnchorStars(state);
     for (const moth of state.moths) if (moth.alive) drawMoth(ctx, moth, state.time);
+    drawCaught(state);
     drawThreads(state);
     drawLances(ctx, state.abilities.lances, state.time);
     if (!lost) drawWeaver(state);

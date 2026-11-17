@@ -48,7 +48,12 @@ export function startWave(state, wave) {
   const definition = waveDefinition(wave);
   const realm = realmIndex(wave);
   state.wave = wave;
-  state.stars = state.attract ? placeAnchorStars(state.random, ATTRACT.stars, ATTRACT.top + 12, ATTRACT.bottom - 16) : placeAnchorStars(state.random, STARS.count, undefined, undefined, state.stars.filter((star) => star.placed));
+  // In play the stars are laid out again until at least three stand within the Weaver's reach, so every wave opens with a loop to hand.
+  const { weaver } = state;
+  for (let tries = 0; tries < 12; tries += 1) {
+    state.stars = state.attract ? placeAnchorStars(state.random, ATTRACT.stars, ATTRACT.top + 12, ATTRACT.bottom - 16) : placeAnchorStars(state.random, STARS.count, undefined, undefined, state.stars.filter((star) => star.placed));
+    if (state.attract || state.stars.filter((star) => starInReach(star, weaver.x, weaver.y, weaver.reach)).length >= 3) break;
+  }
   state.spawnQueue = waveSpawnList(wave, state.random);
   Object.assign(state, { waveTotal: state.spawnQueue.length, spawnTimer: SPAWN.firstDelay, phase: PHASE.PLAY, phaseTime: 0, hitThisWave: false, offer: [] });
   state.stats.waveCaptured = 0;
@@ -119,6 +124,8 @@ function stepWeaving(state, control) {
 
 function catchMoth(state, moth, worths, kind) {
   moth.alive = false;
+  moth.gone = 0;
+  state.effects.caught.push(moth);
   worths.push(moth.points);
   state.stats.captured += 1;
   state.stats.waveCaptured += 1;
